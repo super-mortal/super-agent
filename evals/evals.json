@@ -1,0 +1,240 @@
+{
+  "skill_name": "super-agent",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "用户说：加载 super-agent skill，帮我开发 my-project 项目，需求文档在 /path/to/requirements.md",
+      "expected_output": "主智能体读取 orchestrator.md 作为剧本，调用 init_workspace.py 创建 .super-agent/runs/<项目名>-<日期>--<批次号>/ 新批次，启动 planner 生成 dev-plan / dev-spec / 模板文件，写第一条 main-log.md，然后进入阶段循环",
+      "files": [],
+      "expectations": [
+        "主智能体加载了 orchestrator.md",
+        "调用了 init_workspace.py",
+        "启动了 planner 智能体",
+        "写入了 main-log.md 的首条记录",
+        "未直接编辑任何业务代码文件"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "用户给需求文档后：要求开发 P1 的 task1（新增 history 表与查询接口）",
+      "expected_output": "主智能体从 dev-plan 找到 task1，启动 developer 新 instance，传入必读路径；developer 完成后启动 tester；tester 写测试报告到当前批次的 test-reports/task1-p1-history-test-report.md；主智能体 grep ### 判定： 提取 PASS/FAIL",
+      "files": [],
+      "expectations": [
+        "启动了新的 developer agent（新 ID）",
+        "启动了新的 tester agent（新 ID）",
+        "测试报告路径为 test-reports/task1-p1-history-test-report.md",
+        "tester 报告包含 ### 判定： 行",
+        "主智能体没有直接编辑业务代码",
+        "main-log.md 追加了 5 条以上日志"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "tester 返回 FAIL 后：要求主智能体进入修正循环",
+      "expected_output": "主智能体 resume 同一个 developer 实例，传失败摘要和原测试报告路径；developer 修复并追加 lessons-learned.md；主智能体 resume 同一个 tester，在同一个 task1-p1-history-test-report.md 内追加重测段；记录到 main-log.md",
+      "files": [],
+      "expectations": [
+        "使用了 resume 而不是新启动 developer",
+        "使用了 resume 而不是新启动 tester",
+        "lessons-learned.md 追加了新条目",
+        "重测追加到原测试报告文件，未创建 -2 轮次文件",
+        "main-log.md 记录了修正循环事件"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "要求：连续开发 3 个任务（task1 / task2 / task3）",
+      "expected_output": "task1 用 developer#A，task2 用 developer#B（新 ID），task3 用 developer#C（新 ID）；每个任务的 tester 也是新 ID；不跨任务复用 agent",
+      "files": [],
+      "expectations": [
+        "3 个任务用了 3 个不同的 developer ID",
+        "3 个任务用了 3 个不同的 tester ID",
+        "main-log.md 记录了 3 个任务的完整循环",
+        "修正循环只在任务内进行，不跨任务"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "要求：错误报告必须可定位",
+      "expected_output": "所有错误响应包含 { error_code, message, stage, request_id, details? } 五个字段；前端错误展示有复制错误详情按钮；测试 Agent 断言 error_code 而不只是 HTTP 200",
+      "files": [],
+      "expectations": [
+        "错误响应包含 error_code 字段",
+        "错误响应包含 stage 字段",
+        "错误响应包含 request_id 字段",
+        "测试报告断言 error_code",
+        "前端错误展示组件包含复制按钮"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "要求：developer 不知道某个 SDK 的某个字段怎么用",
+      "expected_output": "developer 用 Context7 MCP（优先）或 Firecrawl MCP 抓官方文档，确认字段后追加 context7-record.md，再用该字段写代码；代码注释引用 context7-record.md 的对应条目",
+      "files": [],
+      "expectations": [
+        "调用了 Context7 或 Firecrawl MCP",
+        "context7-record.md 追加了新条目",
+        "代码注释引用了 context7-record.md 条目",
+        "没有凭印象命名协议字段"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "要求：第 5 轮测试仍然 FAIL",
+      "expected_output": "主智能体标记该任务 ⚠️，不再继续修正或重测，记录到 main-log.md，进入下一任务，不阻塞后续流程",
+      "files": [],
+      "expectations": [
+        "dev-plan.md 标记 ⚠️",
+        "main-log.md 记录了强制通过事件",
+        "主智能体进入下一任务",
+        "未发起第 6 轮测试"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "要求：测试 Agent 越权尝试修改业务代码",
+      "expected_output": "tester 提示自己只能写 test-reports/；拒绝修改业务代码；通过 resume 同 tester 在测试报告中追加新测试段而不是改代码",
+      "files": [],
+      "expectations": [
+        "tester 没有修改 backend/ 或 frontend/",
+        "tester 只写了当前批次 .super-agent/runs/<run-id>/test-reports/ 下的文件",
+        "重测时追加了新段而不是覆盖旧报告"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "要求：用户给的项目名 / 路径 / 错误码前缀是自定义的（比如 my-app、APP、/tmp/my-app）",
+      "expected_output": "init_workspace.py 用 --project-name=my-app、--error-prefix=APP 调用；生成的 dev-spec.md 中错误码格式是 APP-XXX-XXXX；代码标识符使用 my_app_ 前缀，目录和日志仍使用 my-app",
+      "files": [],
+      "expectations": [
+        "init_workspace.py 调用时传入了自定义参数",
+        "dev-spec.md 错误码格式为 APP-XXX-XXXX",
+        "代码标识符使用 my_app_ 前缀",
+        "main-log.md 日志前缀使用 my-app-"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "要求：task7 属于 P2，主要实现 history 模块；首次测试完成并返回 PASS，主智能体需要向用户汇报进度。",
+      "expected_output": "主智能体只输出短进度：task7 PASS | 历史记录封面持久化 | 7/32 | 第 1 轮；不贴测试报告、业务代码或完整文件列表；全部任务结束后的最终汇总单独写入 final-report.md，聊天只给计数汇总和报告路径",
+      "files": [],
+      "expectations": [
+        "进度消息包含 taskN、任务标题、当前序号/总任务数和测试轮次",
+        "进度消息不复制测试报告、代码或完整文件列表",
+        "最终报告写入 final-report.md",
+        "聊天最终汇总只给计数汇总和 final-report.md 路径"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "要求：测试必须串行执行（核心约束之一）",
+      "expected_output": "主智能体严格按 dev -> tester 顺序串行调用，不使用 asyncio.gather / Promise.all 启动多个 tester；每个 tester 必须等待前一个完成后再启动",
+      "files": [],
+      "expectations": [
+        "tester 之间是 await 串行（不是 asyncio.gather）",
+        "每个 tester 完成后才启动下一个",
+        "main-log.md 中 tester 启动事件按顺序记录"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "要求：主智能体不能修改业务代码",
+      "expected_output": "主智能体不调用 Write/Edit 业务代码文件（backend/、frontend/、src/ 等）；只写当前批次 .super-agent/runs/<run-id>/ 下的 plan / logs / test-reports",
+      "files": [],
+      "expectations": [
+        "主智能体没有 Write/Edit 业务代码",
+        "主智能体只写当前批次的 plan/dev-plan.md 和 logs/main-log.md",
+        "developer 角色负责修改业务代码"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "要求：requirements.md 必须存在且包含每阶段的需求摘要",
+      "expected_output": "planner 阶段生成当前批次 .super-agent/runs/<run-id>/plan/requirements.md，每阶段一段：阶段目标、子任务、验收标准、涉及需求文档章节",
+      "files": [],
+      "expectations": [
+        "requirements.md 存在",
+        "每阶段有独立的子段",
+        "包含涉及需求文档章节字段",
+        "主智能体通过此文件告诉子智能体读哪几节"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "要求：路径全部使用 .super-agent/ 而不是 .agent/",
+      "expected_output": "项目内 .super-agent/runs/<run-id>/ 批次目录创建，所有引用（dev-plan/dev-spec/logs/test-reports）都在当前批次下",
+      "files": [],
+      "expectations": [
+        "项目根下只有 .super-agent/ 目录（不是 .agent/）",
+        "所有日志和计划在当前 .super-agent/runs/<run-id>/ 下",
+        "没有 .agent/ 目录残留"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "用户没有提供需求文档，直接加载 super-agent；项目下有两个批次，其中一个 run.json.status=running，另一个 status=completed",
+      "expected_output": "主智能体扫描 .super-agent/runs/*/run.json，只列出 status=running 的批次；再读取 requirements.md、dev-plan.md 和 main-log.md 恢复需求文档、当前阶段和当前任务，询问用户继续该批次还是新建批次；不创建额外指针文件，也不静默创建新目录",
+      "files": [],
+      "expectations": [
+        "扫描了各批次 run.json",
+        "只列出未完成批次",
+        "从 requirements / dev-plan / main-log 恢复并展示当前阶段和当前任务",
+        "询问用户继续哪一批或新建批次",
+        "没有创建额外指针文件",
+        "没有静默创建新批次"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "要求：主智能体记录 developer 启动与完成时间；developer 实际运行了 12 分钟，而且系统当前时间是北京时间",
+      "expected_output": "主智能体在启动时运行 scripts/now.py，记录 YYYY-MM-DD HH.MM 格式的真实时间；收到 developer 完成结果后再次运行 scripts/now.py，使用新的真实北京时间写完成日志，不复用启动时间，也不预估完成时间",
+      "files": [],
+      "expectations": [
+        "启动和完成日志都使用了 now.py 的输出",
+        "完成日志重新获取了当前北京时间",
+        "没有把启动时间直接当作完成时间",
+        "没有使用模型推算或预设的时间",
+        "日志时间格式为 YYYY-MM-DD HH.MM"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "要求：主智能体把 dev-plan 中 task1 的状态从 ⏳ 更新为 🔄",
+      "expected_output": "主智能体使用 Edit 精确定位 task1 所在行并做单行替换；不得使用 Write 重写整个 dev-plan.md",
+      "files": [],
+      "expectations": [
+        "使用了 Edit 单行替换",
+        "只修改 task1 的状态字段",
+        "没有使用 Write 覆盖 dev-plan.md",
+        "没有改动其他任务行"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "要求：task7 属于 P2，主要实现 history 模块；首次测试 FAIL，开发修复后重测 PASS。",
+      "expected_output": "tester 使用 test-reports/task7-p2-history-test-report.md 作为唯一报告文件；首次测试写第 1 次测试段，重测在同一个文件追加第 2 次测试段；主智能体把该稳定路径传给同一个 developer 修复，不创建 task7-p2-history-test-report-2.md",
+      "files": [],
+      "expectations": [
+        "报告文件名符合 {taskN}-{pN}-{module}-test-report.md",
+        "module 使用小写英文和短横线",
+        "一个任务只有一个测试报告文件",
+        "重测未修改文件名",
+        "重测未创建 -2 轮次文件",
+        "主智能体把原报告路径传给 developer"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "要求：tester 第 3 轮测试仍然 FAIL，主智能体让 developer 开始下一轮修复。",
+      "expected_output": "主智能体仍 resume 同一个 developer，并在 prompt 中强制要求先用 Context7 查官方资料，Context7 不覆盖时使用 Firecrawl 搜索官方文档；developer 将来源、原文结论和影响文件追加到 context7-record.md 后再修复，禁止凭猜测修改字段或接口",
+      "files": [],
+      "expectations": [
+        "继续 resume 同一个 developer",
+        "prompt 明确要求 Context7/Firecrawl 官方资料核验",
+        "结论写入 context7-record.md",
+        "developer 没有凭猜测修改协议或 SDK 字段",
+        "第 5 轮仍 FAIL 时才标记 ⚠️"
+      ]
+    }
+  ]
+}

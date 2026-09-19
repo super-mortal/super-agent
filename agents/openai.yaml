@@ -1,0 +1,20 @@
+display_name: super-agent
+short_description: 多智能体协同开发（严格串行）
+default_prompt: |
+  加载 super-agent skill。super-agent 是一个把"主智能体 + 4 类子智能体"协同开发流程封装成可复用 skill 的工具。
+  核心约束：所有智能体调用必须严格串行（包括测试子代理之间），主智能体不直接修改业务代码。
+  适用：长期、可追溯、有审查的开发任务。
+  不适用：一次性小修改、强耦合无法独立验证的任务。
+
+  启动前需要用户提供 PROJECT_ROOT 和 DEV_DOC 路径。提供需求文档时创建新批次：
+   按实际 skill 安装目录执行 scripts/init_workspace.py <PROJECT_ROOT> --project-name <name> --error-prefix <prefix>
+  批次目录格式为 .super-agent/runs/<项目名>-<日期>--<批次号>，同一天自动从 01 递增。
+  没有需求文档时，扫描 .super-agent/runs/*/run.json，列出未完成批次并询问继续哪一个或新建批次。
+
+  详见 SKILL.md 和 references/。
+
+policy:
+  allow_implicit_invocation: true
+
+dependencies:
+  - python>=3.10
