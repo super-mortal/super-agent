@@ -1,30 +1,15 @@
 ---
 name: super-agent
-description: |
-  把"多智能体协同开发"封装成可复用的工作流：主智能体（编排者）+ 计划智能体 +
-  开发智能体 + 测试智能体 协作完成需求拆解、开发、测试与修正循环。提供：
-  - 开箱即用的角色剧本（agents/）
-  - 标准化消息协议与日志格式（references/）
-  - 一键初始化脚本（scripts/init_workspace.py），按运行批次隔离目录
-  - 让用户在新会话里"加载主智能体 → 跑完整循环"。
-
-  触发场景（任意一条即触发）：
-  - 用户说"用多智能体协同开发"、"按敏捷 agent 循环来开发"、"按主智能体方法论来开发"
-  - 用户给出需求文档，要求"按规范拆任务、逐任务开发、自动测试"
-  - 用户说"用 orchestrator + dev + tester 协作开发"
-  - 用户给出 dev-plan.md 模板并要求"按这个计划调度子智能体"
-  - 用户希望"修 bug 时复用原 Agent、重测时复用原 tester"
-  - 用户希望"主智能体不直接开发，只调度和验收"
-
-  不触发的场景：
-  - 用户只要做一次性小修改（agent 自己直接改就行）
-  - 用户只要写代码片段（不需要多智能体协作）
-  - 用户只要回答问题 / 解释概念
+version: 0.0.2
+display_name: 多智能体协同开发
+display_name_en: Super Agent
+description: 把"多智能体协同开发"封装成可复用的工作流：主智能体（编排者）+ 计划智能体 + 开发智能体 + 测试智能体 协作完成需求拆解、开发、测试与修正循环。提供：开箱即用的角色剧本（agents/）、标准化消息协议与日志格式（references/）、一键初始化脚本（scripts/init_workspace.py，按运行批次隔离目录）、让用户在新会话里"加载主智能体 → 跑完整循环"。触发场景（任意一条即触发）：用户说"用多智能体协同开发"、"按敏捷 agent 循环来开发"、"按主智能体方法论来开发"；用户给出需求文档，要求"按规范拆任务、逐任务开发、自动测试"；用户说"用 orchestrator + dev + tester 协作开发"；用户给出 dev-plan.md 模板并要求"按这个计划调度子智能体"；用户希望"修 bug 时复用原 Agent、重测时复用原 tester"；用户希望"主智能体不直接开发，只调度和验收"。不触发的场景：用户只要做一次性小修改（agent 自己直接改就行）、只写代码片段（不需要多智能体协作）、只回答问题或解释概念。
+description_zh: 把多智能体协同开发封装成可复用工作流 —— 主智能体只调度不写代码，计划、开发、测试三类子智能体严格串行协作，完成需求拆解、实现、测试与修正循环。所有产出落盘到 .super-agent/runs/<批次>/，修 bug 时 resume 原 Agent 保留上下文。适合长期、可追溯、需要独立审查的开发任务。
+description_en: Package multi-agent collaborative development into a reusable workflow — an orchestrator agent that only schedules, plus planner, developer and tester sub-agents running strictly serially through requirement breakdown, implementation, testing and a fix loop. Every artifact is written to disk under .super-agent/runs/<batch>/, and bug fixes resume the same agent to preserve context. Built for long-running, auditable development tasks that need independent review.
+category: development
+author: super-mortal
 license: MIT
 metadata:
-  author: super-mortal
-  displayName: Super Agent
-  version: 0.0.1
   summary: 多智能体串行协同开发工作流，协调计划、开发与测试智能体完成需求拆解、实现和验收。
   tags:
     - multi-agent
