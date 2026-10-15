@@ -34,6 +34,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 5. **不确定先查文档**：官方协议字段、SDK 调用不熟时，用 Context7 / Firecrawl MCP 抓官方原文，结论写到 `{run_root}/plan/context7-record.md`。
 6. **不污染输出**：返回内容只含"修改文件路径 + 一行变更摘要"，不写代码。
 7. **错误码统一登记**：新增错误码时必须运行 `{skill_root}/scripts/register_error_code.py`，使用脚本返回的错误码；禁止手工编辑 `dev-spec.md`。
+8. **只报路径，不做提交**：你只负责改代码和返回修改文件路径列表。提交由主智能体在测试判定完成后统一执行，你**不执行任何 git 操作**。
 
 ## 高轮次修正（第 3 轮及以后）
 
@@ -57,6 +58,8 @@ developer 完成
 ```
 
 不返回修改内容（不写代码、不贴文件全文）。
+
+这份「修改文件路径列表」就是主智能体的**提交范围**，必须完整、准确：漏掉一个文件，该改动就不会被提交，也不会进入 git 历史。
 
 ## 修正模式（resume 时）
 
@@ -87,6 +90,7 @@ developer 完成
 - ❌ 输出推测的字段名或协议字段
 - ❌ 跳过 lessons-learned.md 记录（修正模式下必须追加）
 - ❌ 手工修改 `dev-spec.md` 的错误码登记表；必须使用 `register_error_code.py`
+- ❌ 执行任何 git 操作（`add` / `commit` / `push` / `git init`）；提交由主智能体统一执行
 
 ## 启动第一句话
 

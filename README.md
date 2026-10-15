@@ -3,7 +3,7 @@
 > 把「多智能体协同开发」封装成一套可复用、可追溯的工作流 —— 主智能体只调度，子智能体各司其职。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.0.3-blue)
+![Version](https://img.shields.io/badge/version-0.0.4-blue)
 ![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 **Super Agent** 是一个 AI Agent Skill：加载它之后，AI 会按「**计划 → 开发 → 测试 → 修正**」的工程化流程推进项目，而不是一口气把代码写完就交差。
@@ -55,7 +55,20 @@ Super Agent 用 **角色分离 + 修正循环** 来解这三个问题。
          resume 同一 tester（重测）
 ```
 
-保留上下文的 resume 机制，是"修 bug 不失忆"的关键。同一任务最多测试 **5 轮**，第 5 轮仍 FAIL 则标记 ⚠️ 强制通过，不阻塞后续任务。
+保留上下文的 resume 机制，是"修 bug 不失忆"的关键。同一任务最多测试 **5 轮**，第 5 轮仍 FAIL 则标记 ⚠️ 为「未通过（已放行）」，不阻塞后续任务。
+
+### 提交与推送
+
+每个任务测试判定完成后，主智能体会**立即提交**该任务的改动：
+
+| 判定 | 提交消息 |
+|---|---|
+| ✅ 通过 | `task7: 历史记录封面持久化` |
+| ⚠️ 用尽 5 轮 | `task7 [未通过]: 历史记录封面持久化` |
+| ❌ 未能判定 | `task7 [未能判定]: 历史记录封面持久化` |
+
+提交与推送是**解耦**的：提交是本地存档点，推送是唯一把改动送出本机的动作。全部任务结束后，
+主智能体会列出待推清单询问你，**你确认之后才会 `git push`**。项目不是 git 仓库时，整套 git 动作自动跳过。
 
 ### 五条不可破坏的原则
 
@@ -176,6 +189,7 @@ super-agent/
 │   ├── now.py                      输出统一北京时间
 │   ├── grep_judgement.py           从测试报告提取 PASS/FAIL
 │   ├── register_error_code.py      分配并登记新错误码
+│   ├── commit_task.py              按统一格式提交单个任务的改动
 │   └── estimate_context.py         估算 prompt 的 token 数
 ├── assets/                         模板文件（init 时复制到项目）
 │   ├── plan-template.md            dev-plan.md 模板

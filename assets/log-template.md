@@ -4,6 +4,7 @@
 > 时间格式：`YYYY-MM-DD HH.MM`（北京时间）
 > 每行以 `- {YYYY-MM-DD HH.MM} {事件}` 开头
 > 写入前必须运行 `python "{now_script}"`
+> 每个任务提交后追加一行：`- {YYYY-MM-DD HH.MM} 提交 {taskN}（{状态}）：{hash}`
 
 ---
 

@@ -81,11 +81,12 @@
     {
       "id": 7,
       "prompt": "要求：第 5 轮测试仍然 FAIL",
-      "expected_output": "主智能体标记该任务 ⚠️，不再继续修正或重测，记录到 main-log.md，进入下一任务，不阻塞后续流程",
+      "expected_output": "主智能体标记该任务 ⚠️ 为「未通过（已放行）」，不再继续修正或重测，照常提交（提交消息带 `[未通过]` 标记），记录到 main-log.md，进入下一任务，不阻塞后续流程",
       "files": [],
       "expectations": [
         "dev-plan.md 标记 ⚠️",
-        "main-log.md 记录了强制通过事件",
+        "⚠️ 任务仍执行了提交，提交消息带 `[未通过]` 标记",
+        "main-log.md 记录了 ⚠️ 判定与提交 hash",
         "主智能体进入下一任务",
         "未发起第 6 轮测试"
       ]
@@ -234,6 +235,48 @@
         "结论写入 context7-record.md",
         "developer 没有凭猜测修改协议或 SDK 字段",
         "第 5 轮仍 FAIL 时才标记 ⚠️"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "要求：task7 属于 P2，主要实现 history 模块；首次测试返回 PASS，developer 只改动了 src/history.py。",
+      "expected_output": "主智能体先用 Edit 单行替换把 dev-plan 中 task7 标记 ✅，再运行 commit_task.py：--task task7、--title 原样取自 dev-plan、--status pass、--path 只传 developer 返回的 src/history.py；提交消息为 `task7: 历史记录封面持久化`；不使用全量 git add -A，.super-agent/ 过程产物未被提交；hash 写入 main-log.md",
+      "files": [],
+      "expectations": [
+        "判定完成后立即执行了提交，未拖到批次末尾",
+        "调用了 commit_task.py",
+        "--path 来自 developer 返回的修改文件路径",
+        "未使用 git add -A 全量提交",
+        ".super-agent/ 未被提交",
+        "提交消息格式为 `taskN: <任务标题>`",
+        "main-log.md 记录了 commit hash"
+      ]
+    },
+    {
+      "id": 21,
+      "prompt": "要求：task9 连续 5 轮测试仍 FAIL，被标记 ⚠️ 后进入下一个任务；随后其余任务全部完成。",
+      "expected_output": "task9 标记 ⚠️ 后仍执行提交，提交消息为 `task9 [未通过]: <任务标题>`，工作区不残留未提交改动；其余任务照常提交；全部任务结束后写 final-report 并列出待推提交清单（含 ⚠️ 条数）询问用户是否推送；在用户明确确认前不执行 git push",
+      "files": [],
+      "expectations": [
+        "⚠️ 任务仍然产生了提交，未把脏工作区留给下一个任务",
+        "提交消息带 `[未通过]` 标记，未伪装成通过",
+        "final-report.md 列出了未通过任务及其下游依赖任务",
+        "向用户列出了待推提交清单与目标远端",
+        "用户确认前没有执行 git push"
+      ]
+    },
+    {
+      "id": 22,
+      "prompt": "要求：用户给的 project_root 下没有 .git 目录，整个批次照常跑完。",
+      "expected_output": "主智能体照常执行开发与测试循环；每次提交时 commit_task.py 返回 SKIP，主智能体跳过提交继续推进；不执行 git init、不执行 git push；main-log.md 记录一次跳过原因，final-report.md 的推送状态标注「未启用提交」；批次正常收尾并汇报",
+      "files": [],
+      "expectations": [
+        "没有执行 git init",
+        "没有执行 git push",
+        "提交被跳过而非报错阻断流程",
+        "main-log.md 记录了跳过原因",
+        "final-report.md 标注「未启用提交」",
+        "整个批次仍正常收尾并汇报"
       ]
     }
   ]

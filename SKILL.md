@@ -5,7 +5,7 @@ license: MIT
 metadata:
   display_name: "多智能体协同开发"
   display_name_en: "Super Agent"
-  version: "0.0.3"
+  version: "0.0.4"
   category: "development"
   platforms: ["Windows", "macOS", "Linux"]
   author: "super-mortal"
@@ -47,6 +47,8 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 6 | dev 修完 → 重测 | resume 同一 tester Agent（不开新 tester） |
 | 7 | 跨 role 并行（如 backend-dev + frontend-dev 同时跑） | 不允许 |
 | 8 | 更新 `dev-plan.md` | 只能用 Edit 单行替换，禁止用 Write 覆盖整个文件 |
+| 9 | 任务判定完成 | 必须立即提交（`commit_task.py`），✅ / ⚠️ / ❌ 三态都要提交；未提交不得取下一个任务 |
+| 10 | 推送到远端 | 仅在用户明确确认后执行 `git push`；主智能体永不自动推送 |
 
 ### 主智能体的强制行为清单
 
@@ -57,6 +59,8 @@ super-agent 用三角色 + 修正循环解这三个问题：
 - 主智能体永不修改业务代码
 - 主智能体只运行 `grep_judgement.py --strict` 提取判定，不读报告全文
 - 更新 `dev-plan.md` 只能 Edit 单行替换，禁止 Write 覆盖整个文件
+- 每个任务判定完成后立即运行 `commit_task.py` 提交，提交范围只用 developer 返回的修改文件路径
+- 全部任务结束后先写报告、再询问是否推送；用户确认前绝不执行 push
 
 ## 核心原则（不可破坏）
 
@@ -68,8 +72,10 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 路径即接口 | 主智能体只拿文件路径，不读内容；子智能体收到路径后自己读 |
 | resume 同 ID | 修 bug resume 同开发 Agent；重测 resume 同测试 Agent；新任务开新 Agent |
 | 测试只读 | 测试 Agent 永不修改业务代码，只能写测试报告到当前批次的 `test-reports/`；一个任务固定一个 `{taskN}-{pN}-{module}-test-report.md` |
-| 五轮上限 | 同一任务最多执行 5 次 tester 测试，第 5 轮仍 FAIL 标记 ⚠️ 进入下一个任务 |
+| 五轮上限 | 同一任务最多执行 5 次 tester 测试，第 5 轮仍 FAIL 标记 ⚠️ 未通过（已放行）并照常提交，然后进入下一个任务 |
 | 依赖风险不中断 | 依赖用于排序和风险提示；上游未通过时下游仍继续，以确保批次可以跑完，但必须记录风险并加强集成验证 |
+| 提交即存档 | 每个任务的提交是"已验证状态"的存档点；三态都要提交，但 ⚠️ / ❌ 必须在提交消息里带标记，不得伪装成通过 |
+| 推送需授权 | 提交与推送解耦：提交是本地存档，推送是唯一把改动送出本机的动作，必须逐批次取得用户确认 |
 
 ## 工作流概览
 
@@ -88,23 +94,26 @@ super-agent 用三角色 + 修正循环解这三个问题：
    |
    v
 [阶段 C] 任务循环（每个任务走一遍）
-   ┌────────────────────────────────────────┐
-   │  取下一个 ⏳ 任务                          │
-   │  -> 启动 dev（新 ID）                     │
+   ┌─────────────────────────────────────────────┐
+   │  取下一个 ⏳ 任务                           │
+   │  -> 启动 dev（新 ID）                       │
    │  -> dev 完成返回路径列表                    │
-   │  -> 启动 tester（新 ID）                  │
-   │  -> grep ### 判定：PASS/FAIL              │
-   │  -> PASS -> 标记 ✅ -> 取下一个任务        │
-   │  -> FAIL -> 进入修正循环（最多 5 次测试）    │
-   │     -> resume 同 dev 修                   │
-   │     -> resume 同 tester 重测              │
-   │     -> 全 PASS 或第 5 轮 ⚠️ -> 标记 ✅/⚠️ │
-   │  -> 回到"取下一个任务"                     │
-   └────────────────────────────────────────┘
+   │  -> 启动 tester（新 ID）                    │
+   │  -> grep ### 判定：PASS/FAIL                │
+   │  -> PASS -> 标记 ✅                         │
+   │  -> FAIL -> 进入修正循环（最多 5 次）       │
+   │     -> resume 同 dev 修                     │
+   │     -> resume 同 tester 重测                │
+   │     -> 全 PASS 标记 ✅ / 5 轮用尽标记 ⚠️   │
+   │     -> 判定协议修不好标记 ❌                │
+   │  -> 三态都提交（commit_task.py）            │
+   │  -> 回到"取下一个任务"                      │
+   └─────────────────────────────────────────────┘
    |
    v
 [阶段 D] 完成与汇报
-   写 final-report.md + 汇总日志 + 向用户发送短进度
+   D1 收尾：写 final-report.md + 汇总日志 + 向用户发送短进度（含提交清单）
+   D2 推送确认：列出待推提交 -> 用户确认后才 push（永不自动推送）
 ```
 
 > 注：**主智能体工作阶段**（A/B/C/D）≠ **项目开发阶段**（dev-plan 里的 P0/P1/P2）。
@@ -122,6 +131,8 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | tester（新） | 测试范围 + 待测代码路径列表 + dev-server 地址 | tester PASS/FAIL + 报告绝对路径 |
 | dev（resume） | 同上 + 失败摘要 + 测试报告路径 | developer 完成 + 修改文件绝对路径列表 |
 | tester（resume） | 同一报告路径 + 原失败摘要 | tester PASS/FAIL + 报告绝对路径（追加段） |
+| 提交（每任务） | 任务号 + 标题 + 判定状态 + developer 返回的路径列表 | `commit_task.py` 输出 `OK: {short_hash}` |
+| 推送（批次末） | 待推提交清单 + 目标远端与分支 | 用户确认后才执行 push |
 
 ### 关键技术细节速查
 
@@ -131,17 +142,24 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 时间来源 | 每次写日志前运行 `python {skill_root}/scripts/now.py`，原样使用输出；禁止自行推算或提前填写完成时间 |
 | Agent ID 记录 | 主智能体日志每次带 `(ID: {subagent-id})`，用于后续 resume |
 | 必读文件数量 | 最多 5 个（控制子智能体上下文） |
-| 测试轮数上限 | 5（第 5 轮仍 FAIL 标记 ⚠️ 强制通过） |
+| 测试轮数上限 | 5（第 5 轮仍 FAIL → 标记 ⚠️ 未通过（已放行）） |
 | 子智能体返回格式 | 极简 5 行内，不含代码（避免主智能体上下文污染） |
 | 文件路径 | 全程绝对路径 |
 | 运行批次 | 提供需求文档时创建新批次；没有需求文档时扫描 `.super-agent/runs/*/run.json` 的 `status`，列出未完成批次并询问继续或新建 |
 | 测试报告命名与追加 | 每个任务固定为 `{taskN}-{pN}-{module}-test-report.md`；重测时追加新轮次段，不覆盖、不改名、不创建 `-2` 轮次文件 |
 | 测试判定协议 | 主智能体只运行 `grep_judgement.py --strict`；严格模式只认最新测试段的最终判定，最新段缺判定时返回 `UNKNOWN` 并触发协议修正，不能沿用旧 PASS |
 | 依赖处理 | `dev-plan.md` 记录依赖；上游非 ✅ 时下游继续，但 tester 必须验证集成假设，main-log 和 final-report 记录依赖风险 |
-| 用户进度格式 | `taskN 开始/PASS/FAIL | 任务标题 | 当前序号/总任务数`；FAIL 时附 `第 N/5 轮` |
-| 最终报告 | 全部任务结束后填写 `{run_root}/final-report.md`；聊天只给计数汇总和报告路径 |
+| 用户进度格式 | `taskN 开始/PASS/FAIL | 任务标题 | 当前序号/总任务数`；FAIL 时附 `第 N/5 轮`；提交后追加 `已提交 {hash}` |
+| 最终报告 | 全部任务结束后填写 `{run_root}/final-report.md`；聊天给计数汇总、报告路径与待推清单，并询问是否推送 |
 | 高轮次失败 | 第 3 轮 FAIL 后，resume developer 时必须先查 Context7；不覆盖时用 Firecrawl 查官方资料，禁止猜测 |
 | 错误码断言 | 测试用例必须断言 error_code（不能只验 HTTP 状态码） |
+| 提交时机 | 每个任务判定完成、标记 dev-plan 之后，取下一个任务之前；三态都要提交，漏提交不得推进 |
+| 提交范围 | 只用 developer 返回的修改文件路径（`commit_task.py --path`）；`.super-agent/` 过程产物不入库 |
+| 提交消息 | `taskN: 标题` / `taskN [未通过]: 标题` / `taskN [未能判定]: 标题`，由 `commit_task.py` 统一生成，标题原样取自 dev-plan |
+| ⚠️ 的语义 | ⚠️ = 未通过（已放行）：同一任务用尽 5 轮测试仍未 PASS，按规则放行并提交后进入下一个任务；提交消息里短写为 `[未通过]` |
+| 推送门槛 | 全部任务结束、final-report 写完后列出待推清单询问用户；未经确认不得 push |
+| 无 git 仓库 | 不执行任何 git 操作：不提交、不推送、不 `git init`；日志记一行，final-report 标注"未启用提交" |
+| git 禁止动作 | 不用 `--amend`、不 `reset --hard`、不 `push --force`、不跳过 hook（`--no-verify`） |
 
 ## 目录结构
 
@@ -166,6 +184,7 @@ super-agent/
 │   ├── now.py                       输出统一北京时间（日志 / run.json）
 │   ├── grep_judgement.py            从测试报告 grep 提取 PASS/FAIL
 │   ├── register_error_code.py       分配并登记新的项目错误码
+│   ├── commit_task.py               按统一格式提交单个任务的改动
 │   └── estimate_context.py          估算子智能体 prompt 的 token 数
 ├── assets/                          模板文件（init 时复制到项目）
 │   ├── plan-template.md             dev-plan.md 模板
@@ -173,6 +192,7 @@ super-agent/
 │   ├── log-template.md              main-log.md 模板
 │   ├── lessons-template.md          lessons-learned.md 模板
 │   ├── context7-record-template.md  context7-record.md 模板
+│   ├── requirements-template.md     requirements.md 模板
 │   └── final-report-template.md     final-report.md 模板
 ├── evals/
 │   └── evals.json                   评测用例
@@ -198,7 +218,7 @@ super-agent/
 | 修 bug Agent | **必须 resume 同一个开发 Agent**（同 subagent_type + 同 agentId） |
 | 重测 Agent | **必须 resume 同一个测试 Agent**（同 subagent_type + 同 agentId） |
 | 测试轮数上限 | 5 轮（包含首次测试） |
-| 第 5 轮仍 FAIL | 标记 ⚠️ 强制通过，进入下一个任务，不阻塞后续 |
+| 第 5 轮仍 FAIL | 标记 ⚠️ 未通过（已放行）（提交消息带 `[未通过]`），进入下一个任务，不阻塞后续 |
 | 报告文件 | 一个任务固定一个 `{taskN}-{pN}-{module}-test-report.md`；每轮重测追加新段，不覆盖、不改名 |
 
 
@@ -219,6 +239,7 @@ super-agent/
 - 2026-09-08 16.02 启动 tester task1 (ID: pn-tester-2026-09-08-16.02)
 - 2026-09-08 16.30 tester PASS (ID: pn-tester-2026-09-08-16.02)
 - 2026-09-08 16.31 ── task1 完成 ──
+- 2026-09-08 16.31 提交 task1（PASS）：a1b2c3d
 ```
 
 完整规范（含子智能体日志格式）见 `references/logging-format.md`。
@@ -259,6 +280,16 @@ python {skill_root}/scripts/register_error_code.py {run_root}/plan/dev-spec.md \
   --meaning "用户未登录或登录已过期" \
   --location "middleware/auth.py:42"
 
+# 提交单个任务的改动；--path 来自 developer 返回的修改文件列表，可重复
+python {skill_root}/scripts/commit_task.py \
+  --task task7 \
+  --title "历史记录封面持久化" \
+  --status pass \
+  --path src/history.py \
+  --rounds 2 \
+  --report test-reports/task7-p1-history-test-report.md \
+  --run {run_id}
+
 # 估算 prompt 的 token 数（避免爆窗）
 python {skill_root}/scripts/estimate_context.py
 ```
@@ -272,3 +303,5 @@ python {skill_root}/scripts/estimate_context.py
 3. 修正循环是否能正确 resume 同 ID
 4. 主智能体是否会越权修改业务代码
 5. 错误报告是否带 error_code / stage / request_id
+6. 每个任务判定后是否提交，提交范围是否只用 developer 返回的路径
+7. 批次结束后是否先询问用户、未经确认不得推送，以及无 git 仓库时是否整套跳过

@@ -44,7 +44,7 @@
 - ⏳ 待办
 - 🔄 进行中
 - ✅ 完成
-- ⚠️ 低质量通过（第 5 轮测试仍 FAIL）
+- ⚠️ 未通过（已放行）：同一任务用尽 5 轮测试仍未 PASS，按规则放行进入下一个任务
 - ❌ 阻塞
 
 主智能体通过读这张表决定下一步做什么。
@@ -55,9 +55,9 @@
 
 报告只记录：
 
-- 总任务数、PASS、⚠️ 低质量通过、❌ 阻塞的汇总
+- 总任务数、PASS、⚠️ 未通过（已放行）、❌ 阻塞的汇总
 - 每个任务的阶段、模块、结果、测试轮次、测试报告路径
-- 低质量通过和阻塞项
+- 未通过（已放行）和阻塞项
 
 不复制业务代码、测试报告全文或长篇修复过程。`run.json.final_report` 指向该文件。
 
@@ -143,7 +143,8 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 - `.super-agent/runs/<run-id>/plan/` 下 5 个文件（基于 `assets/*.md` 模板）
 - `.super-agent/runs/<run-id>/logs/` 下 1 个空文件
 - `.super-agent/runs/<run-id>/test-reports/` 空目录
-- 可选更新 `.gitignore`，忽略批次日志和测试报告
+- 可选更新 `.gitignore`，忽略批次日志和测试报告（提交流程本来也不会纳入 `.super-agent/`，
+  此选项是为了让 `git status` 保持干净）
 
 脚本每次只创建新批次；同一天通过 `--01`、`--02` 递增避免覆盖旧数据。
 
