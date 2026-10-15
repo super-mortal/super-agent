@@ -3,7 +3,7 @@
 > 把「多智能体协同开发」封装成一套可复用、可追溯的工作流 —— 主智能体只调度，子智能体各司其职。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.0.2-blue)
+![Version](https://img.shields.io/badge/version-0.0.3-blue)
 ![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 **Super Agent** 是一个 AI Agent Skill：加载它之后，AI 会按「**计划 → 开发 → 测试 → 修正**」的工程化流程推进项目，而不是一口气把代码写完就交差。
