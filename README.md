@@ -3,7 +3,7 @@
 > 把「多智能体协同开发」封装成一套可复用、可追溯的工作流 —— 主智能体只调度，子智能体各司其职。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.0.5-blue)
+![Version](https://img.shields.io/badge/version-0.0.6-blue)
 ![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 **Super Agent** 是一个 AI Agent Skill：加载它之后，AI 会按「**计划 → 开发 → 测试 → 修正**」的工程化流程推进项目，而不是一口气把代码写完就交差。
@@ -84,6 +84,26 @@ Super Agent 用 **角色分离 + 修正循环** 来解这三个问题。
 推送统一走 `scripts/push_task.py`：先用 `ls-remote` 判断远端有没有这个分支，再用
 `merge-base` 判断远端是否领先本地，最后才 `git push -u origin {branch}`。所以既不会因为
 "本地没有 upstream" 卡住，也不会因为 "远端分支还不存在" 报错，更不会盲推一个注定被拒的 push。
+
+### 提交身份
+
+Trae 这类 IDE 会在进程里注入 `GIT_COMMITTER_NAME=trae-solo-agent`，让提交署名成工具名，
+而 `.gitconfig` 看起来完全正常。技能在**加载时**就会检查这件事：
+
+```
+配置身份 (git config user.name) ≠ 实际身份 (git var GIT_COMMITTER_IDENT)
+                          ↓
+                   问你一次，三选一
+```
+
+| 你的选择 | 记录位置 | 下次 |
+|---|---|---|
+| A 用 IDE 默认，本项目不再提示 | 项目 `.super-agent/preferences.json` | 跳过询问，署名 IDE |
+| B 本轮用我自己的 | 本批次 `run.json` | 新批次会再问 |
+| C 本项目以后都用我的 | 项目 `.super-agent/preferences.json` | 跳过询问，署名你 |
+
+**记录按项目存放**，所以 A 项目选了 IDE、B 项目仍可以选你自己，互不影响。
+想改主意：`python scripts/git_identity.py --repo <项目> --clear`。
 
 ### 五条不可破坏的原则
 

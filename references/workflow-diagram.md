@@ -10,6 +10,7 @@
 4. [状态机](#状态机)
 5. [简明对照](#简明对照)
 6. [提交与推送](#提交与推送)
+7. [提交身份确认](#7-提交身份确认)
 
 ## 1. 主流程（启动 -> 完成）
 
@@ -233,3 +234,65 @@
 消息只有标题一行，不带 `test-rounds` / `test-report` / `run` 正文。
 
 提交范围只用 developer 返回的修改文件路径，`.super-agent/` 过程产物不入库。
+
+## 7. 提交身份确认
+
+部分 IDE 会在**进程级**注入身份环境变量，让 commit 署名成工具名而不是用户本人
+（Trae 已知注入 `GIT_COMMITTER_NAME=trae-solo-agent`；Cursor / Copilot 一类还会追加
+`Co-authored-by`）。这类注入不改 `.gitconfig`，所以光看配置排查不出来。
+
+检测方式很简单——比两个值：
+
+```
+配置身份  git config user.name / user.email
+实际身份  git var GIT_COMMITTER_IDENT     ← 受环境变量影响
+两者不同  说明有东西在覆盖 → 需要问用户
+```
+
+### 时机：加载阶段（阶段 A），早于任何提交
+
+```
+[技能加载]
+   │
+   ▼
+git_identity.py --repo {project_root}
+   │
+   ├─ OK: 无需询问      ─► 一致，或已有记录 ─► 继续
+   ├─ SKIP: 不是仓库    ─► 记"未启用 git" ─► 继续
+   └─ ASK: 存在冲突     ─► 问用户三选一
+                             │
+                             ├─ A) 用 IDE 默认，本项目不再提示 ─► --set ide  （项目级）
+                             ├─ B) 本轮用我自己的              ─► run.json    （仅本批）
+                             └─ C) 本项目以后都用我的          ─► --set user （项目级）
+                                     │
+                                     ▼
+                              记一行 main-log，继续初始化
+```
+
+### 记录与跳过
+
+| 选择 | 存放位置 | 下次加载 |
+|---|---|---|
+| A `ide` | `{project_root}/.super-agent/preferences.json` | 本项目读到即 `OK`，**不再问**，署名 IDE |
+| B `user`（本轮） | 本批次 `run.json.identity_policy`；本批提交统一带 `--identity user` | 新批次没有记录 → 若仍有冲突会再问 |
+| C `user`（本项目以后） | `{project_root}/.super-agent/preferences.json` | 本项目读到即 `OK`，**不再问**，署名用户 |
+
+### 提交时的行为
+
+`commit_task.py` 按记录执行（`--identity auto` 读偏好，缺省 `user`）：
+
+| 策略 | 行为 | 输出 |
+|---|---|---|
+| `user` | 剔除 `GIT_AUTHOR_*` / `GIT_COMMITTER_*`，用 git config 身份 + `-c` / `--author` 强制写入 | `OK: {hash}`，回读不符则 `WARN` |
+| `ide` | 保留注入，让 IDE 署名 | `OK: {hash}` + `NOTE: 本次使用 IDE / 环境身份 …` |
+
+诊断命令：
+
+```bash
+python {skill_root}/scripts/git_identity.py --repo {project_root}
+# OK: 无需询问（配置身份与实际提交身份一致）
+#   配置身份：super-mortal <2169702639@qq.com>
+#   实际提交：super-mortal <2169702639@qq.com>
+
+python {skill_root}/scripts/git_identity.py --clear   # 忘掉记录，下次重新问
+```

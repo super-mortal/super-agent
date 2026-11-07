@@ -5,6 +5,7 @@
 ```
 {project_root}/
 └── .super-agent/
+    ├── preferences.json          项目级偏好（提交身份策略等），不入库
     └── runs/
         └── {run-id}/                  批次目录：{项目名}-{YYYY-MM-DD}--{NN}
             ├── run.json                批次状态（当前阶段、当前任务、完成信息）
@@ -158,6 +159,7 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
   "status": "running",
   "push_policy": "batch-end",
   "push_policy_confirmed_at": "2026-09-10T10:05:00+08:00",
+  "identity_policy": "user",
   "created_at": "2026-09-10T10:00:00+08:00",
   "updated_at": "2026-09-10T10:00:00+08:00",
   "completed_at": null,
@@ -173,6 +175,9 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 | `per-task` | 每个任务提交后立即推送 |
 | `batch-end` | 只在批次末尾统一推送（默认） |
 | `none` | 未启用 git：项目不是 git 仓库，或没有配置远端；不提交也不推送 |
+
+`identity_policy` 只在用户选择「本轮用我自己的身份」时写入（取值 `user`）；
+持久选择（A/C）存在项目级 `.super-agent/preferences.json`，不写进 `run.json`。
 
 流程完成后，主智能体把 `status` 改为 `completed`，填写 `updated_at`、
 `completed_at` 和 `final_report`。`run.json` 不保存实时阶段和任务；继续批次时，

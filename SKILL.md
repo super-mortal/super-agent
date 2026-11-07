@@ -5,7 +5,7 @@ license: MIT
 metadata:
   display_name: "多智能体协同开发"
   display_name_en: "Super Agent"
-  version: "0.0.5"
+  version: "0.0.6"
   category: "development"
   platforms: ["Windows", "macOS", "Linux"]
   author: "super-mortal"
@@ -65,6 +65,8 @@ super-agent 用三角色 + 修正循环解这三个问题：
 - 逐任务推送模式下，每个任务提交成功后立即 `push_task.py --confirm`；批次末模式只在报告写完后问一次
 - 用户没明确回答策略时默认"批次末统一推送"，不得自行选择逐任务推送
 - 探活发现"不是 git 仓库"或"没有配置远端"时，直接整套跳过 git（不提交、不推送），不问策略
+- 按已记录的身份策略提交：`user` 剔除注入并强制用户身份，`ide` 保留注入让 IDE 署名；回读不符就停下问用户
+- 加载时若发现身份冲突且本项目无记录，必须询问用户三选一，不得替用户决定用谁的署名
 
 ## 核心原则（不可破坏）
 
@@ -88,6 +90,7 @@ super-agent 用三角色 + 修正循环解这三个问题：
 ```
 [阶段 A] 项目初始化（一次性）
    主智能体 + init_workspace.py
+   先查提交身份：git_identity.py -> 冲突且本项目无记录时问用户三选一（IDE / 仅本轮 / 本项目以后）
    提供需求文档：创建新的 `.super-agent/runs/<项目名-日期--批次号>/`
    未提供需求文档：扫描 `runs/*/run.json`，列出未完成批次并询问继续或新建
    |
@@ -172,6 +175,7 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 提交时机 | 每个任务判定完成、标记 dev-plan 之后，取下一个任务之前；三态都要提交，漏提交不得推进（`push_policy = none` 时整套 git 跳过，不提交） |
 | 提交范围 | 只用 developer 返回的修改文件路径（`commit_task.py --path`）；`.super-agent/` 过程产物不入库 |
 | 提交消息 | 只有一行：`taskN: 标题` / `taskN [未通过]: 标题` / `taskN [未能判定]: 标题`，由 `commit_task.py` 统一生成，标题原样取自 dev-plan；**不写 test-rounds / test-report / run 正文** |
+| 提交身份 | 加载时比对「配置身份」与「实际提交身份」（`git var GIT_COMMITTER_IDENT`，受 IDE 注入影响）。不一致就问用户三选一：①用 IDE 默认，本项目不再提示 ②仅本轮用我的 ③本项目以后都用我的。①③记入项目级 `.super-agent/preferences.json`，②只写本批次 `run.json.identity_policy` 且本批提交统一带 `--identity user`；本项目有记录则跳过询问 |
 | ⚠️ 的语义 | ⚠️ = 未通过（已放行）：同一任务用尽 5 轮测试仍未 PASS，按规则放行并提交后进入下一个任务；提交消息里短写为 `[未通过]` |
 | 推送策略 | `per-task`（每任务提交后立即推送）或 `batch-end`（全部提交完统一推送，默认）；不是 git 仓库或没有远端时为 `none`，整套 git 动作跳过；阶段 B2 询问一次，续跑批次读 `run.json` 不再重复问 |
 | 推送命令 | 固定 `git push -u origin {branch}`（`-u` 负责首次绑定 upstream）；用 `push_task.py` 而不是手写，避免推到错的分支 |
@@ -203,8 +207,9 @@ super-agent/
 │   ├── now.py                       输出统一北京时间（日志 / run.json）
 │   ├── grep_judgement.py            从测试报告 grep 提取 PASS/FAIL
 │   ├── register_error_code.py       分配并登记新的项目错误码
-│   ├── commit_task.py               按统一格式提交单个任务的改动
+│   ├── commit_task.py               按统一格式提交单个任务的改动（身份按已记录策略）
 │   ├── push_task.py                 推送前探活（upstream / 远端分支 / non-fast-forward）并推送
+│   ├── git_identity.py              检查提交身份冲突并记录用户选择（IDE / 用户本人）
 │   └── estimate_context.py          估算子智能体 prompt 的 token 数
 ├── assets/                          模板文件（init 时复制到项目）
 │   ├── plan-template.md             dev-plan.md 模板
@@ -302,12 +307,23 @@ python {skill_root}/scripts/register_error_code.py {run_root}/plan/dev-spec.md \
 
 # 提交单个任务的改动；--path 来自 developer 返回的修改文件列表，可重复
 # 提交消息只有一行标题，不需要再传 rounds / report
+# 提交身份按加载时记录的策略执行（默认 user，可用 --identity 覆盖）
 python {skill_root}/scripts/commit_task.py \
   --task task7 \
   --title "历史记录封面持久化" \
   --status pass \
   --path src/history.py \
   --repo {project_root}
+
+# 诊断：加载时检查提交身份是否被 IDE 覆盖（首行 OK / ASK / SKIP）
+python {skill_root}/scripts/git_identity.py --repo {project_root}
+
+# 记录本项目选择（项目级，不写用户主目录）：ide = 用 IDE 默认；user = 以后都用我自己的
+python {skill_root}/scripts/git_identity.py --set ide
+python {skill_root}/scripts/git_identity.py --set user
+
+# 清空记录，下次重新询问
+python {skill_root}/scripts/git_identity.py --clear
 
 # 推送前先预览（只读：查远端、查分支、查待推条数、检测会不会被拒）
 python {skill_root}/scripts/push_task.py --repo {project_root}
@@ -331,3 +347,4 @@ python {skill_root}/scripts/estimate_context.py
 6. 每个任务判定后是否提交，提交范围是否只用 developer 返回的路径
 7. 批次结束后是否先询问用户、未经确认不得推送，以及无 git 仓库时是否整套跳过
 8. 计划完成后、循环开始前是否询问推送策略，逐任务策略下是否每任务提交后立即推送
+9. 环境里被注入 `GIT_COMMITTER_NAME=trae-solo-agent` 时，加载阶段是否询问了三选一、是否按用户选择记录并在下批次跳过询问

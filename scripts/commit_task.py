@@ -33,6 +33,16 @@ test-reports/ 里本来就有，不必在 git log 里重复一遍。
 无远端即视为「不启用 git」：没有远端就没有任何代码会离开本机，本地 commit 也失去
 存档之外的意义，因此默认跳过。确实想只留本地历史时，显式加 `--allow-no-remote`。
 
+提交身份：按技能加载时用户选定的偏好执行（`--identity auto` 读
+`{project_root}/.super-agent/preferences.json`，没记录时默认用户本人）。
+
+    user  -> 剔除 IDE/Agent 注入的 GIT_AUTHOR_* / GIT_COMMITTER_*，
+             用 git config 里的身份 + `-c` / `--author` 强制写入
+    ide   -> 保留注入，commit 署名为 IDE（如 trae-solo-agent）
+
+提交后会回读 `%an/%ae/%cn/%ce`：用户身份模式下不符则打 `WARN`；
+IDE 模式下打一行 `NOTE` 说明本次署名为工具。
+
 `.super-agent/` 是本 skill 的过程产物目录，`.gitignore` 由 init_workspace.py 在初始化时
 生成或追加；两者都不属于任何任务、也永不入库，因此不计入 WARN 统计 —— 否则每个任务
 都会亮一次一字不差的警告，真正漏文件时反而被淹没。
@@ -42,9 +52,14 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from git_identity import IDENTITY_ENV_VARS, saved_mode  # noqa: E402
+
 STATUS_CHOICES = ("pass", "warn", "unknown")
+IDENTITY_CHOICES = ("auto", "user", "ide")
 STATUS_MARKERS = {
     "pass": "",
     "warn": " [未通过]",
@@ -54,10 +69,20 @@ STATUS_MARKERS = {
 EXEMPT_PATHS = (".super-agent/", ".gitignore")
 
 
-def run_git(repo: Path, *args: str, stdin: str | None = None) -> subprocess.CompletedProcess:
-    """执行 git 命令。消息按 UTF-8 字节传入，避免受本机 locale 影响。"""
+def run_git(
+    repo: Path, *args: str, stdin: str | None = None, clean_identity: bool = True
+) -> subprocess.CompletedProcess:
+    """执行 git 命令。消息按 UTF-8 字节传入，避免受本机 locale 影响。
+
+    clean_identity=True 时剔除 IDE / Agent 注入的身份环境变量
+    （如 Trae 的 GIT_COMMITTER_NAME=trae-solo-agent）。
+    用户选择「用 IDE 身份」时要传 False，让注入保持生效。
+    """
     env = dict(os.environ)
     env.setdefault("GIT_PAGER", "cat")
+    if clean_identity:
+        for key in IDENTITY_ENV_VARS:
+            env.pop(key, None)
     return subprocess.run(
         ["git", *args],
         cwd=str(repo),
@@ -91,6 +116,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="只打印提交消息，不执行提交")
     parser.add_argument("--allow-no-remote", action="store_true",
                         help="没有配置远端时仍然本地提交（默认跳过整套 git 动作）")
+    parser.add_argument("--identity", choices=IDENTITY_CHOICES, default="auto",
+                        help="提交身份：auto=按已记录偏好（默认 user）/ user=用户本人 / ide=沿用 IDE 注入")
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
@@ -115,16 +142,43 @@ def main() -> int:
     # 提交消息只保留一行标题；测试轮次 / 报告路径 / run_id 不再重复写入 git log
     message = f"{args.task}{STATUS_MARKERS[args.status]}: {args.title}\n"
 
+    # 提交身份：按已记录偏好决定，缺省用用户本人
+    mode = args.identity
+    if mode == "auto":
+        mode = (saved_mode(repo) or {}).get("mode") or "user"
+
+    author_name = author_email = ""
+    if mode == "user":
+        author_name = text(run_git(repo, "config", "--get", "user.name").stdout)
+        author_email = text(run_git(repo, "config", "--get", "user.email").stdout)
+        if not author_name or not author_email:
+            return fail("选择了用户身份，但仓库没有配置 user.name / user.email")
+
     if args.dry_run:
         print("DRY-RUN: 未执行提交，消息如下")
         print(message, end="")
+        if mode == "user":
+            print(f"  身份：{author_name} <{author_email}>（用户本人）")
+        else:
+            effective = text(run_git(repo, "var", "GIT_COMMITTER_IDENT").stdout)
+            print(f"  身份：沿用 IDE / 环境（{effective}）")
         return 0
 
     added = run_git(repo, "add", "-A", "--", *args.path)
     if added.returncode != 0:
         return fail(text(added.stderr) or "git add 失败")
 
-    committed = run_git(repo, "commit", "-F", "-", stdin=message)
+    if mode == "user":
+        committed = run_git(
+            repo,
+            "-c", f"user.name={author_name}",
+            "-c", f"user.email={author_email}",
+            "commit", "-F", "-", "--author", f"{author_name} <{author_email}>",
+            stdin=message,
+        )
+    else:
+        # 保留 IDE 注入的身份环境变量，按用户选择让 IDE 署名
+        committed = run_git(repo, "commit", "-F", "-", stdin=message, clean_identity=False)
     if committed.returncode != 0:
         return fail(text(committed.stderr) or text(committed.stdout) or "git commit 失败")
 
@@ -132,6 +186,17 @@ def main() -> int:
     short_hash = text(sha.stdout) if sha.returncode == 0 else "unknown"
 
     print(f"OK: {short_hash}")
+
+    # 回读实际落库的身份
+    actual = text(run_git(repo, "log", "-1", "--format=%an\t%ae\t%cn\t%ce").stdout).split("\t")
+    if len(actual) == 4:
+        an, ae, cn, ce = actual
+        if mode == "user" and ((an, ae) != (author_name, author_email)
+                               or (cn, ce) != (author_name, author_email)):
+            print(f"WARN: 实际提交身份与预期不符：author {an} <{ae}> / committer {cn} <{ce}>")
+            print(f"  预期：{author_name} <{author_email}>")
+        elif mode == "ide":
+            print(f"NOTE: 按已记录偏好，本次使用 IDE / 环境身份 {an} <{ae}>")
 
     leftover = run_git(repo, "-c", "core.quotepath=false", "status", "--porcelain")
     if leftover.returncode == 0:

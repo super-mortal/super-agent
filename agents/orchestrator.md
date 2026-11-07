@@ -51,6 +51,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 - 每个任务判定完成后运行 `commit_task.py`，提交该任务的改动（✅ / ⚠️ / ❌ 三态都要提交）
 - 推送按阶段 B2 用户选定的策略执行：`per-task` = 每任务提交后立即推送；`batch-end` = 全部结束后问一次
 - 推送统一走 `push_task.py`（带 `--confirm` 才真推），不手写 `git push`
+- 提交身份按加载时的选择执行：`user` = 剔除 IDE 注入、用 git config 里的身份；`ide` = 沿用注入的署名并打一行 `NOTE`；不确定时可显式传 `commit_task.py --identity user|ide`
 - 项目不是 git 仓库或没有配置远端时，整套 git 动作跳过（不提交、不推送）：日志记一行，final-report 标注"未启用提交"
 
 **你持有的信息**：
@@ -137,21 +138,52 @@ python {skill_root}/scripts/now.py --iso
      向用户询问继续其中一个批次，还是提供需求文档新建批次
      没有未完成批次时，请用户提供需求文档后再开始
 
-2. 确定 RUN_ROOT，并读取 RUN_ROOT / DEV_PLAN 获取当前阶段
+2. 检查提交身份（早于任何提交动作；A/C 会写一行项目偏好）：
+
+   ```bash
+   python {skill_root}/scripts/git_identity.py --repo {project_root}
+   ```
+
+   | 首行 | 处理 |
+   |---|---|
+   | `OK: 无需询问` | 配置身份与实际一致，或已有记录 → 继续 |
+   | `SKIP: 不是 git 仓库` | 记一行"未启用 git"，继续 |
+   | `ASK: 提交身份存在冲突` | 问用户三选一，见下 |
+
+   ASK 时的询问模板（只问一次）：
+
+   ```text
+   检测到当前环境会让提交署名为工具（{实际提交身份}），而不是你（{配置身份}）。
+   提交时用哪个身份？
+     A) 用 IDE 默认的，本项目以后不再提示
+     B) 本轮用我自己的身份（只影响这个批次）
+     C) 本项目以后都用我自己的身份
+   ```
+
+   | 用户选择 | 动作 |
+   |---|---|
+   | A | `git_identity.py --set ide`（写入 `{project_root}/.super-agent/preferences.json`） |
+   | B | 只写 `run.json` 的 `identity_policy = "user"`，不动项目偏好；**本批次每次 `commit_task.py` 都要带 `--identity user`**（否则会沿用项目里已记录的 ide 偏好） |
+   | C | `git_identity.py --set user`（写入偏好文件） |
+
+   记一行 main-log：`提交身份 = {ide / user-本轮 / user-本项目}（用户选择）`。
+   下一批次启动时脚本会读到记录并输出 `OK: 已记录偏好`，**不再询问**。
+
+3. 确定 RUN_ROOT，并读取 RUN_ROOT / DEV_PLAN 获取当前阶段
    - 如果 dev-plan.md 仍是初始化模板 → 启动 planner（agents/planner.md）生成项目计划
    - 如果 dev-plan.md 已有任务 → 读取当前 ⏳ 任务
 
-3. 运行 `python {skill_root}/scripts/now.py`，然后写入首条日志：
+4. 运行 `python {skill_root}/scripts/now.py`，然后写入首条日志：
    - {YYYY-MM-DD HH.MM} 项目启动，当前阶段 = {阶段 A|B|C|D}
 
-4. 向用户报告：
+5. 向用户报告：
    - 当前批次 ID 与 RUN_ROOT
    - 当前阶段（A 初始化 / B 计划 / C 任务循环 / D 完成）
    - 总任务数（来自 dev-plan.md）
    - 测试轮数（MAX_TEST_ROUNDS，默认 5，包含首次测试）
    - 最终报告路径（{run_root}/final-report.md）
 
-5. 启动对应阶段工作
+6. 启动对应阶段工作
 ```
 
 ## 推送策略确认（阶段 B2，循环开始前只问一次）
@@ -364,6 +396,15 @@ python {skill_root}/scripts/commit_task.py \
 | `ERROR: ...` | 提交失败，记录错误并**停下询问用户**；不重试、不绕过、不自行改工作区 |
 
 提交范围**只用 developer 返回的修改文件路径**，禁止全量 `git add -A`；`.super-agent/` 过程产物不入库。
+
+**身份策略**：部分 IDE 会在进程里注入 `GIT_COMMITTER_NAME` / `GIT_AUTHOR_NAME`（例如 Trae 的 `trae-solo-agent`），导致 commit 署名成工具名。加载阶段已用 `git_identity.py` 检查并让用户三选一，结果存在偏好文件或 `run.json.identity_policy`；`commit_task.py` 按记录执行：
+
+| 策略 | 提交行为 |
+|---|---|
+| `user` | 剔除 `GIT_AUTHOR_*` / `GIT_COMMITTER_*`，用 git config 身份 + `-c` / `--author` 强制写入 |
+| `ide` | 保留注入，按 IDE 署名，输出 `NOTE:` |
+
+用户身份模式下若回读的 `%an/%ae/%cn/%ce` 与预期不符（有 hook 又改了一次），打 `WARN` 并停下问用户。
 
 提交成功后立刻看 `push_policy`：`per-task` → 紧接一次 `push_task.py --confirm`；`batch-end` → 不推，等批次末尾统一问。
 

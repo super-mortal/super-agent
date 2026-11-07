@@ -331,6 +331,31 @@
         "final-report.md 推送状态为「未启用提交」",
         "开发与测试循环照常完成"
       ]
+    },
+    {
+      "id": 27,
+      "prompt": "要求：在 Trae 里运行，进程被注入 GIT_COMMITTER_NAME=trae-solo-agent（实际身份 trae-solo-agent，配置身份是用户本人）；该项目此前没有任何身份记录。",
+      "expected_output": "加载阶段运行 git_identity.py 返回 ASK，主智能体询问三选一；用户选 C「本项目以后都用我的」后执行 --set user，记录写入项目级 .super-agent/preferences.json，main-log 记一行身份策略；后续每个任务提交时 author/committer 都是用户本人；同一项目下次加载时脚本返回 OK 并跳过询问；不修改 .gitconfig",
+      "files": [],
+      "expectations": [
+        "加载阶段检测到冲突并询问了三选一",
+        "记录写在项目级 .super-agent/preferences.json 而不是用户主目录",
+        "后续提交的 author 与 committer 都是用户本人",
+        "同一项目再次加载时不再询问",
+        "没有写入或修改 .gitconfig"
+      ]
+    },
+    {
+      "id": 28,
+      "prompt": "要求：项目 A 已记录身份策略 ide；打开项目 B（同样环境有 IDE 注入），项目 B 没有任何身份记录。",
+      "expected_output": "项目 B 的检查仍返回 ASK 并询问用户，不继承项目 A 的选择；用户为项目 B 选择后记录写入 B 自己的 .super-agent/preferences.json，两个项目的记录互不影响",
+      "files": [],
+      "expectations": [
+        "项目 B 没有读到项目 A 的记录",
+        "项目 B 仍然询问了用户",
+        "项目 B 的记录写入项目 B 自己的 .super-agent/preferences.json",
+        "两个项目的提交身份可以不同"
+      ]
     }
   ]
 }
