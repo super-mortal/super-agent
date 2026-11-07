@@ -122,6 +122,8 @@ def write_run_metadata(run_root: Path, project_root: Path, project_name: str, er
         "error_prefix": error_prefix,
         "timezone": "Asia/Shanghai",
         "status": "running",
+        "push_policy": None,
+        "push_policy_confirmed_at": None,
         "created_at": now_iso(),
         "updated_at": now_iso(),
         "completed_at": None,

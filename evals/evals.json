@@ -278,6 +278,59 @@
         "final-report.md 标注「未启用提交」",
         "整个批次仍正常收尾并汇报"
       ]
+    },
+    {
+      "id": 23,
+      "prompt": "要求：planner 已生成 dev-plan（3 个任务），项目是 git 仓库且有 origin 远端。用户还没说推送方式。",
+      "expected_output": "主智能体在启动第一个 developer 之前，询问用户选「逐任务推送」还是「批次末统一推送」，并把结果写入 run.json 的 push_policy 与 push_policy_confirmed_at，同时在 main-log.md 记一行推送策略；用户没明确回答时按 batch-end 处理，不得自行选 per-task",
+      "files": [],
+      "expectations": [
+        "在启动第一个 developer 之前询问了推送策略",
+        "run.json 写入了 push_policy 与 push_policy_confirmed_at",
+        "main-log.md 记录了推送策略",
+        "用户未明确回答时默认 batch-end",
+        "没有自行替用户选择 per-task"
+      ]
+    },
+    {
+      "id": 24,
+      "prompt": "要求：用户选 A（逐任务推送），前两个任务正常推送到 origin/main；第三个任务提交后，远端已被他人推了新提交。",
+      "expected_output": "task3 提交成功（本地存档不丢），但 push_task.py 返回 BLOCKED（远端领先，non-fast-forward）；主智能体停手向用户报告，不执行 --force、不自动 rebase/merge；剩余任务改为只提交、批次末再统一问；main-log.md 记录了被拒原因；final-report.md 推送状态记为「部分已推送」",
+      "files": [],
+      "expectations": [
+        "task3 仍然完成了本地提交",
+        "检测到 non-fast-forward 后没有执行 git push --force",
+        "没有自动执行 rebase 或 merge",
+        "向用户报告了远端领先并给出手动处理选项",
+        "剩余任务降级为只提交",
+        "final-report.md 推送状态为「部分已推送」"
+      ]
+    },
+    {
+      "id": 25,
+      "prompt": "要求：task2 判定 PASS 并提交，检查提交消息格式。",
+      "expected_output": "提交消息只有一行 `task2: <dev-plan 里的任务标题>`，不带 test-rounds / test-report / run 等正文；⚠️ 与 ❌ 分别写作 `[未通过]` 和 `[未能判定]`",
+      "files": [],
+      "expectations": [
+        "提交消息只有一行标题",
+        "消息里没有 test-rounds / test-report / run 正文",
+        "标题原样取自 dev-plan，未被改写"
+      ]
+    },
+    {
+      "id": 26,
+      "prompt": "要求：project_root 下有 .git 目录，但 `git remote` 为空（没有配置任何远端），批次照常跑完。",
+      "expected_output": "阶段 B2 探活发现没有远端，push_policy 记为 none 且不询问推送策略；整个批次不执行任何 git 提交（commit_task.py 调用即 SKIP），不执行 git remote add、不执行 git init、不执行 push；main-log.md 记一行「项目未启用 git」；final-report.md 推送状态为「未启用提交」；开发与测试循环照常跑完",
+      "files": [],
+      "expectations": [
+        "没有询问推送策略",
+        "没有产生任何 git commit",
+        "没有执行 git remote add",
+        "没有执行 git init 或 git push",
+        "main-log.md 记录了未启用 git 的原因",
+        "final-report.md 推送状态为「未启用提交」",
+        "开发与测试循环照常完成"
+      ]
     }
   ]
 }

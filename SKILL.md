@@ -5,7 +5,7 @@ license: MIT
 metadata:
   display_name: "多智能体协同开发"
   display_name_en: "Super Agent"
-  version: "0.0.4"
+  version: "0.0.5"
   category: "development"
   platforms: ["Windows", "macOS", "Linux"]
   author: "super-mortal"
@@ -48,7 +48,8 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 7 | 跨 role 并行（如 backend-dev + frontend-dev 同时跑） | 不允许 |
 | 8 | 更新 `dev-plan.md` | 只能用 Edit 单行替换，禁止用 Write 覆盖整个文件 |
 | 9 | 任务判定完成 | 必须立即提交（`commit_task.py`），✅ / ⚠️ / ❌ 三态都要提交；未提交不得取下一个任务 |
-| 10 | 推送到远端 | 仅在用户明确确认后执行 `git push`；主智能体永不自动推送 |
+| 10 | 推送策略 | 计划完成后、任务循环开始前**必须**询问用户选哪种：`逐任务推送` 或 `批次末统一推送`；用户没明确回答时默认批次末 |
+| 11 | 推送执行 | 只在已选策略范围内执行 `git push -u origin {branch}`；远端领先（non-fast-forward）时停手问用户，永不 `--force`、永不 `reset --hard` |
 
 ### 主智能体的强制行为清单
 
@@ -59,8 +60,11 @@ super-agent 用三角色 + 修正循环解这三个问题：
 - 主智能体永不修改业务代码
 - 主智能体只运行 `grep_judgement.py --strict` 提取判定，不读报告全文
 - 更新 `dev-plan.md` 只能 Edit 单行替换，禁止 Write 覆盖整个文件
-- 每个任务判定完成后立即运行 `commit_task.py` 提交，提交范围只用 developer 返回的修改文件路径
-- 全部任务结束后先写报告、再询问是否推送；用户确认前绝不执行 push
+- 每个任务判定完成后立即运行 `commit_task.py` 提交，提交范围只用 developer 返回的修改文件路径（`push_policy = none` 时整套跳过）
+- planner 完成后、启动第一个 dev 之前，**必须先问用户推送策略**，并把选择写入 `run.json` 与 main-log
+- 逐任务推送模式下，每个任务提交成功后立即 `push_task.py --confirm`；批次末模式只在报告写完后问一次
+- 用户没明确回答策略时默认"批次末统一推送"，不得自行选择逐任务推送
+- 探活发现"不是 git 仓库"或"没有配置远端"时，直接整套跳过 git（不提交、不推送），不问策略
 
 ## 核心原则（不可破坏）
 
@@ -75,7 +79,7 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 五轮上限 | 同一任务最多执行 5 次 tester 测试，第 5 轮仍 FAIL 标记 ⚠️ 未通过（已放行）并照常提交，然后进入下一个任务 |
 | 依赖风险不中断 | 依赖用于排序和风险提示；上游未通过时下游仍继续，以确保批次可以跑完，但必须记录风险并加强集成验证 |
 | 提交即存档 | 每个任务的提交是"已验证状态"的存档点；三态都要提交，但 ⚠️ / ❌ 必须在提交消息里带标记，不得伪装成通过 |
-| 推送需授权 | 提交与推送解耦：提交是本地存档，推送是唯一把改动送出本机的动作，必须逐批次取得用户确认 |
+| 推送需授权 | 提交与推送解耦：提交是本地存档，推送是唯一把改动送出本机的动作。推送策略（逐任务 / 批次末）在计划完成后一次选定，选定范围内即可执行，永不擅自 `--force` |
 
 ## 工作流概览
 
@@ -90,6 +94,13 @@ super-agent 用三角色 + 修正循环解这三个问题：
    v
 [阶段 B] 计划生成（planner 仅跑一次）
    主智能体 -> planner（读 dev_doc -> 写完整 dev-plan / dev-spec / 模板；任务划分粒度见 `references/task-decomposition.md`）
+
+   |
+   v
+[阶段 B2] 推送策略确认（plan 完成后、循环开始前，只问一次）
+   主智能体 -> 用户：逐任务推送，还是批次末统一推送？
+   无 git 仓库 / 无远端时不问，直接记"未启用提交"，整套 git 动作跳过（不提交也不推送）
+   选择写入 {run_root}/run.json 的 push_policy，并记一行 main-log
 
    |
    v
@@ -109,11 +120,14 @@ super-agent 用三角色 + 修正循环解这三个问题：
    │  -> 三态都提交（commit_task.py）            │
    │  -> 回到"取下一个任务"                      │
    └─────────────────────────────────────────────┘
+   （push_policy = per-task 时，每次提交成功后立即推送；batch-end 时只提交）
    |
    v
 [阶段 D] 完成与汇报
    D1 收尾：写 final-report.md + 汇总日志 + 向用户发送短进度（含提交清单）
-   D2 推送确认：列出待推提交 -> 用户确认后才 push（永不自动推送）
+   D2 推送收口：
+      - 批次末策略 -> 列待推清单 -> 用户确认后 push（永不自动推送）
+      - 逐任务策略 -> 已在任务内推完，只汇报最终状态与剩余待推
 ```
 
 > 注：**主智能体工作阶段**（A/B/C/D）≠ **项目开发阶段**（dev-plan 里的 P0/P1/P2）。
@@ -131,8 +145,10 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | tester（新） | 测试范围 + 待测代码路径列表 + dev-server 地址 | tester PASS/FAIL + 报告绝对路径 |
 | dev（resume） | 同上 + 失败摘要 + 测试报告路径 | developer 完成 + 修改文件绝对路径列表 |
 | tester（resume） | 同一报告路径 + 原失败摘要 | tester PASS/FAIL + 报告绝对路径（追加段） |
+| 推送策略（阶段 B2） | 询问用户：`逐任务推送` / `批次末统一推送` | 写入 `run.json` 的 `push_policy`，记一行 main-log |
 | 提交（每任务） | 任务号 + 标题 + 判定状态 + developer 返回的路径列表 | `commit_task.py` 输出 `OK: {short_hash}` |
-| 推送（批次末） | 待推提交清单 + 目标远端与分支 | 用户确认后才执行 push |
+| 推送（逐任务策略） | 上一个任务的 commit hash | `push_task.py --confirm` 输出 `OK:` / `BLOCKED:` / `SKIP:` / `ERROR:` |
+| 推送（批次末策略） | 待推提交清单 + 目标远端与分支 | 用户确认后才执行 `push_task.py --confirm` |
 
 ### 关键技术细节速查
 
@@ -150,15 +166,18 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 测试判定协议 | 主智能体只运行 `grep_judgement.py --strict`；严格模式只认最新测试段的最终判定，最新段缺判定时返回 `UNKNOWN` 并触发协议修正，不能沿用旧 PASS |
 | 依赖处理 | `dev-plan.md` 记录依赖；上游非 ✅ 时下游继续，但 tester 必须验证集成假设，main-log 和 final-report 记录依赖风险 |
 | 用户进度格式 | `taskN 开始/PASS/FAIL | 任务标题 | 当前序号/总任务数`；FAIL 时附 `第 N/5 轮`；提交后追加 `已提交 {hash}` |
-| 最终报告 | 全部任务结束后填写 `{run_root}/final-report.md`；聊天给计数汇总、报告路径与待推清单，并询问是否推送 |
+| 最终报告 | 全部任务结束后填写 `{run_root}/final-report.md`；聊天给计数汇总、报告路径与推送状态；batch-end 策略下附待推清单并询问是否推送 |
 | 高轮次失败 | 第 3 轮 FAIL 后，resume developer 时必须先查 Context7；不覆盖时用 Firecrawl 查官方资料，禁止猜测 |
 | 错误码断言 | 测试用例必须断言 error_code（不能只验 HTTP 状态码） |
-| 提交时机 | 每个任务判定完成、标记 dev-plan 之后，取下一个任务之前；三态都要提交，漏提交不得推进 |
+| 提交时机 | 每个任务判定完成、标记 dev-plan 之后，取下一个任务之前；三态都要提交，漏提交不得推进（`push_policy = none` 时整套 git 跳过，不提交） |
 | 提交范围 | 只用 developer 返回的修改文件路径（`commit_task.py --path`）；`.super-agent/` 过程产物不入库 |
-| 提交消息 | `taskN: 标题` / `taskN [未通过]: 标题` / `taskN [未能判定]: 标题`，由 `commit_task.py` 统一生成，标题原样取自 dev-plan |
+| 提交消息 | 只有一行：`taskN: 标题` / `taskN [未通过]: 标题` / `taskN [未能判定]: 标题`，由 `commit_task.py` 统一生成，标题原样取自 dev-plan；**不写 test-rounds / test-report / run 正文** |
 | ⚠️ 的语义 | ⚠️ = 未通过（已放行）：同一任务用尽 5 轮测试仍未 PASS，按规则放行并提交后进入下一个任务；提交消息里短写为 `[未通过]` |
-| 推送门槛 | 全部任务结束、final-report 写完后列出待推清单询问用户；未经确认不得 push |
-| 无 git 仓库 | 不执行任何 git 操作：不提交、不推送、不 `git init`；日志记一行，final-report 标注"未启用提交" |
+| 推送策略 | `per-task`（每任务提交后立即推送）或 `batch-end`（全部提交完统一推送，默认）；不是 git 仓库或没有远端时为 `none`，整套 git 动作跳过；阶段 B2 询问一次，续跑批次读 `run.json` 不再重复问 |
+| 推送命令 | 固定 `git push -u origin {branch}`（`-u` 负责首次绑定 upstream）；用 `push_task.py` 而不是手写，避免推到错的分支 |
+| 推送被拒 | `BLOCKED:` 表示远端领先本地（non-fast-forward）。停手向用户报告，不 force、不自动 rebase/merge |
+| 推送门槛 | 批次末策略：全部任务结束、final-report 写完后列出待推清单询问用户；用户确认前不得 push |
+| 无 git 仓库 / 无远端 | 不执行任何 git 操作：不提交、不推送、不 `git init`；日志记一行，final-report 标注"未启用提交"；确需本地历史时 `commit_task.py --allow-no-remote`（仅限无远端场景） |
 | git 禁止动作 | 不用 `--amend`、不 `reset --hard`、不 `push --force`、不跳过 hook（`--no-verify`） |
 
 ## 目录结构
@@ -185,6 +204,7 @@ super-agent/
 │   ├── grep_judgement.py            从测试报告 grep 提取 PASS/FAIL
 │   ├── register_error_code.py       分配并登记新的项目错误码
 │   ├── commit_task.py               按统一格式提交单个任务的改动
+│   ├── push_task.py                 推送前探活（upstream / 远端分支 / non-fast-forward）并推送
 │   └── estimate_context.py          估算子智能体 prompt 的 token 数
 ├── assets/                          模板文件（init 时复制到项目）
 │   ├── plan-template.md             dev-plan.md 模板
@@ -281,14 +301,19 @@ python {skill_root}/scripts/register_error_code.py {run_root}/plan/dev-spec.md \
   --location "middleware/auth.py:42"
 
 # 提交单个任务的改动；--path 来自 developer 返回的修改文件列表，可重复
+# 提交消息只有一行标题，不需要再传 rounds / report
 python {skill_root}/scripts/commit_task.py \
   --task task7 \
   --title "历史记录封面持久化" \
   --status pass \
   --path src/history.py \
-  --rounds 2 \
-  --report test-reports/task7-p1-history-test-report.md \
-  --run {run_id}
+  --repo {project_root}
+
+# 推送前先预览（只读：查远端、查分支、查待推条数、检测会不会被拒）
+python {skill_root}/scripts/push_task.py --repo {project_root}
+
+# 真正推送；--confirm 必须由用户明确选择后才加
+python {skill_root}/scripts/push_task.py --repo {project_root} --confirm
 
 # 估算 prompt 的 token 数（避免爆窗）
 python {skill_root}/scripts/estimate_context.py
@@ -305,3 +330,4 @@ python {skill_root}/scripts/estimate_context.py
 5. 错误报告是否带 error_code / stage / request_id
 6. 每个任务判定后是否提交，提交范围是否只用 developer 返回的路径
 7. 批次结束后是否先询问用户、未经确认不得推送，以及无 git 仓库时是否整套跳过
+8. 计划完成后、循环开始前是否询问推送策略，逐任务策略下是否每任务提交后立即推送

@@ -28,6 +28,9 @@ env/
 # super-agent 运行时产物（由 init_workspace.py 在目标项目内创建）
 .super-agent/
 
+# 工作区记忆目录（本地上下文，不入库）
+.workbuddy/
+
 # 编辑器 / IDE
 .vscode/
 .idea/

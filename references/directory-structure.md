@@ -156,12 +156,23 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 {
   "run_id": "pocketnote-2026-09-10--01",
   "status": "running",
+  "push_policy": "batch-end",
+  "push_policy_confirmed_at": "2026-09-10T10:05:00+08:00",
   "created_at": "2026-09-10T10:00:00+08:00",
   "updated_at": "2026-09-10T10:00:00+08:00",
   "completed_at": null,
   "final_report": null
 }
 ```
+
+`push_policy` 取值：
+
+| 值 | 含义 |
+|---|---|
+| `null` | 尚未询问（初始化后、阶段 B2 之前） |
+| `per-task` | 每个任务提交后立即推送 |
+| `batch-end` | 只在批次末尾统一推送（默认） |
+| `none` | 未启用 git：项目不是 git 仓库，或没有配置远端；不提交也不推送 |
 
 流程完成后，主智能体把 `status` 改为 `completed`，填写 `updated_at`、
 `completed_at` 和 `final_report`。`run.json` 不保存实时阶段和任务；继续批次时，

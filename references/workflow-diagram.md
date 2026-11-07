@@ -107,6 +107,10 @@
             └──────┬──────┘
                    ▼
             ┌─────────────┐
+            │ 推送策略确认  │ ← 只问一次（per-task / batch-end）
+            └──────┬──────┘
+                   ▼
+            ┌─────────────┐
        ┌───►│  取出任务    │
        │    └──────┬──────┘
        │           ▼
@@ -153,7 +157,7 @@
 └──────┬──────┘
        ▼
 ┌─────────────┐
-│ 询问是否推送 │ ← 用户确认后才 push
+│  推送收口    │ ← batch-end：用户确认后才 push
 └─────────────┘
 ```
 
@@ -168,29 +172,55 @@
 | 新任务开发 | 新 Agent（**不复用旧任务**） |
 | 新任务测试 | 新 Agent（**不复用旧任务**） |
 | 任务判定完成（✅ / ⚠️ / ❌） | 主智能体执行 `commit_task.py` 提交，三态都提交；⚠️ 语义是「未通过（已放行）」，不是「通过但有隐患」 |
-| 项目不是 git 仓库 | 跳过全部 git 动作，流程照常推进 |
-| 批次全部完成 | 写 final-report → 询问用户 → **用户确认后才** `git push` |
+| 计划完成、循环开始前 | 询问推送策略，写入 `run.json.push_policy`；用户不选默认 `batch-end` |
+| 项目不是 git 仓库 / 没有远端 | `push_policy = none`，不提交也不推送，流程照常推进 |
+| 批次全部完成（batch-end） | 写 final-report → 列待推清单 → 用户确认后才 `push_task.py --confirm` |
+| 批次全部完成（per-task） | 提交时已逐条推完，只汇报最终状态 |
 
 ## 6. 提交与推送
 
-提交发生在每个任务的判定之后、取下一个任务之前；推送只发生在批次末尾、用户确认之后。
+先定策略，再进循环。提交发生在每个任务的判定之后；推送时机由阶段 B2 选定的 `push_policy` 决定。
 
 ```
+[计划完成] ─► 探活（是否仓库 / 是否有远端）
+   │
+   ├─ 不是 git 仓库 ──► push_policy = none ─► 跳过全部 git 动作（不提交不推送）
+   ├─ 无远端        ──► push_policy = none ─► 同上：没有出口的存档没有意义
+   └─ 正常          ──► 询问用户
+                          ├─ A) 逐任务推送 ──► push_policy = per-task
+                          └─ B) 批次末推送 ──► push_policy = batch-end（默认）
+
 [任务判定完成]
    │
+   │  （push_policy = none 时整段跳过：不提交、不推送，直接取下一个任务）
+   │
    ├─ ✅ PASS       ─┐
-   ├─ ⚠️ 用尽 5 轮   ─┼─► commit_task.py ─► OK: {hash} ─► 写 main-log ─► 取下一个任务
-   └─ ❌ 未能判定    ─┘
-        （项目不是 git 仓库 → SKIP，跳过提交继续流程）
+   ├─ ⚠️ 用尽 5 轮   ─┼─► commit_task.py ─► OK: {hash} ─► 写 main-log
+   └─ ❌ 未能判定    ─┘                                   │
+                                                          ├─ per-task  ─► push_task.py --confirm
+                                                          │                 ├─ OK      ─► 取下一个任务
+                                                          │                 └─ BLOCKED ─► 停手报告，剩余改为 batch-end
+                                                          └─ batch-end ─► 取下一个任务
 
-[全部任务完成] ─► final-report.md ─► 列出待推清单 ─► 询问用户
-                                                     │
-                                         ┌───────────┴───────────┐
-                                         │                       │
-                                    用户确认                  未确认 / 说不推
-                                         │                       │
-                                     git push                保留在本地
+[全部任务完成] ─► final-report.md
+                     │
+                     ├─ batch-end ─► push_task.py（预览）─► 列待推清单询问用户
+                     │                                       ├─ 确认   ─► --confirm ─► OK / BLOCKED / ERROR
+                     │                                       └─ 不确认 ─► 提交保留在本地
+                     └─ per-task  ─► 汇报已推条数 + 剩余待推（通常为 0）
 ```
+
+推送命令固定为 `git push -u origin {branch}`，由 `push_task.py` 内部执行。前置判定与探活：
+
+| 情形 | 脚本怎么判断 | 结果 |
+|---|---|---|
+| 不是 git 仓库 | `rev-parse --git-dir` 失败 | `SKIP`，整套 git 跳过 |
+| 没有配置远端 | `git remote` 为空 | `SKIP`，不提交也不推送 |
+| 远端还没有该分支 | `git ls-remote --heads origin {branch}` 为空 | 正常首推，`-u` 绑定 upstream |
+| 有分支但本地没绑 upstream | `@{u}` 解析失败 | 同样用 `-u` 推 |
+| 远端领先本地 | `git merge-base --is-ancestor origin/{branch} HEAD` 为假 / `rev-list HEAD..origin` > 0 | `BLOCKED`，不推、不 force |
+| 没有待推提交 | `rev-list origin/{branch}..HEAD` 为 0 | `SKIP` |
+| 认证 / 网络失败 | git 退出码非 0（已禁交互输入） | `ERROR`，原样上报 |
 
 提交消息：
 
@@ -199,5 +229,7 @@
 | ✅ PASS | `task7: 历史记录封面持久化` |
 | ⚠️ 用尽 5 轮 | `task7 [未通过]: 历史记录封面持久化` |
 | ❌ 未能判定 | `task7 [未能判定]: 历史记录封面持久化` |
+
+消息只有标题一行，不带 `test-rounds` / `test-report` / `run` 正文。
 
 提交范围只用 developer 返回的修改文件路径，`.super-agent/` 过程产物不入库。
