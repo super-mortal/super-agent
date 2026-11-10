@@ -3,7 +3,7 @@
 > 把「多智能体协同开发」封装成一套可复用、可追溯的工作流 —— 主智能体只调度，子智能体各司其职。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Version](https://img.shields.io/badge/version-0.0.6-blue)
+![Version](https://img.shields.io/badge/version-0.0.7-blue)
 ![Python](https://img.shields.io/badge/python-%3E%3D3.10-blue)
 
 **Super Agent** 是一个 AI Agent Skill：加载它之后，AI 会按「**计划 → 开发 → 测试 → 修正**」的工程化流程推进项目，而不是一口气把代码写完就交差。
@@ -72,6 +72,10 @@ Super Agent 用 **角色分离 + 修正循环** 来解这三个问题。
 策略在**计划生成后、第一个任务开始前**问一次，写进 `run.json` 的 `push_policy`，
 续跑同一批次不会重复问。**项目不是 git 仓库、或者没有配置远端时，整套 git 动作直接跳过**——
 连本地提交都不做，只在日志和报告里标一句"未启用提交"。
+
+**提交序号即任务号**：planner 的 P0 前置工作（规划文档 / 脚手架）固定编号 `task0`，
+不进 dev/test 循环、也不提交；开发任务从 `task1` 起连续编号。所以 git log 的第一条永远是
+`task1`，`taskN` 就是第 N 条提交，不用再心算。
 
 提交消息只有一行标题：
 

@@ -18,7 +18,7 @@
 
 | 任务 | 阶段 | 模块 | 结果 | 测试轮次 | 测试报告 | commit |
 |---|---|---|---|---|---|---|
-| task1 | P0 | core | ✅ | 1 | {report_path_or_na} | {short_hash_or_na} |
+| task1 | P1 | core | ✅ | 1 | {report_path_or_na} | {short_hash_or_na} |
 
 ## 未通过（已放行）、依赖风险与阻塞
 

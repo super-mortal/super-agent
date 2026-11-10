@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -121,6 +122,14 @@ def main() -> int:
     args = parser.parse_args()
 
     repo = Path(args.repo).resolve()
+
+    # 任务号校验：只接受 taskN；task0 是 planner 的前置工作，不进循环也不入库
+    m = re.fullmatch(r"task(\d+)", args.task.strip())
+    if not m:
+        return fail(f"--task 必须是 taskN 形式（如 task1），收到：{args.task}")
+    if int(m.group(1)) == 0:
+        return fail("task0 是 planner 的前置工作（规划文档 / 脚手架），不参与提交；"
+                    "若有需要入库的骨架代码，请划入 task1")
 
     if run_git(repo, "rev-parse", "--git-dir").returncode != 0:
         print("SKIP: 当前目录不是 git 仓库，本次不执行任何 git 操作")

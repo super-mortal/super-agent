@@ -117,7 +117,7 @@ Context7 / Firecrawl 抓官方文档的结论记录。子智能体抓完协议�
 
 文件名规则：
 
-- `{taskN}`：全局任务编号，例如 `task1`、`task7`
+- `{taskN}`：全局任务编号，例如 `task1`、`task7`；`task0` 是 planner 前置工作，不参与测试，因此不会产生 `task0-*` 报告
 - `{pN}`：阶段编号，文件名使用小写，例如 `p0`、`p1`、`p2`
 - `{module}`：任务主要交付模块，使用小写英文和短横线，例如 `history`、`knowledge-base`、`wechat-clawbot`
 - `test-report.md`：固定后缀，表示测试报告

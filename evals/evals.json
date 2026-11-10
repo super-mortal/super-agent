@@ -356,6 +356,20 @@
         "项目 B 的记录写入项目 B 自己的 .super-agent/preferences.json",
         "两个项目的提交身份可以不同"
       ]
+    },
+    {
+      "id": 29,
+      "prompt": "要求：planner 为项目生成 dev-plan，包含 P0 公共基础设施 + 3 个开发功能；项目是 git 仓库且有 origin 远端，用户选择批次末推送。",
+      "expected_output": "dev-plan 里 P0 前置工作编号为 task0（状态 ✅、依赖 —、备注标注不入库），三个开发任务编号为 task1 / task2 / task3；主智能体取任务时跳过 task0，不为它启动 dev 或 tester，也没有 task0 的测试报告与提交；git log 顺序为 `task1: <标题>`、`task2: ...`、`task3: ...`；调用 commit_task.py --task task0 时脚本返回 ERROR 并拒绝",
+      "files": [],
+      "expectations": [
+        "P0 前置工作编号为 task0，状态 ✅",
+        "三个开发任务编号为 task1 / task2 / task3，不跳号",
+        "没有为 task0 启动 dev 或 tester",
+        "没有产生 task0 的测试报告文件",
+        "第一条 git 提交是 task1",
+        "commit_task.py 拒绝 --task task0"
+      ]
     }
   ]
 }

@@ -42,7 +42,7 @@ tools: Read, Bash, Grep, Glob, Write, Edit
 
 文件名规范：`{taskN}-{pN}-{module}-test-report.md`。
 
-- `taskN`：全局任务编号，例如 `task1`、`task7`。
+- `taskN`：全局任务编号，例如 `task1`、`task7`（`task0` 是 planner 的前置工作，不会派给 tester）。
 - `pN`：任务所属阶段，文件名使用小写，例如 `p0`、`p1`、`p2`。
 - `module`：任务主要交付模块，使用小写英文和短横线，例如 `history`、`knowledge-base`、`wechat-clawbot`。
 - 一个任务固定一个报告文件。重测时继续写同一个文件，轮次写在文件内部。

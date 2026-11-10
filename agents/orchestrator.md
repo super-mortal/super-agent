@@ -49,6 +49,7 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 **你执行的 git 动作**：
 
 - 每个任务判定完成后运行 `commit_task.py`，提交该任务的改动（✅ / ⚠️ / ❌ 三态都要提交）
+- `task0` 永不提交：它是 planner 的前置工作，不进任务循环，脚本层也会直接拒绝 `--task task0`
 - 推送按阶段 B2 用户选定的策略执行：`per-task` = 每任务提交后立即推送；`batch-end` = 全部结束后问一次
 - 推送统一走 `push_task.py`（带 `--confirm` 才真推），不手写 `git push`
 - 提交身份按加载时的选择执行：`user` = 剔除 IDE 注入、用 git config 里的身份；`ide` = 沿用注入的署名并打一行 `NOTE`；不确定时可显式传 `commit_task.py --identity user|ide`
@@ -95,9 +96,10 @@ push_policy    = {run.json 的 push_policy；未定时为 unset，阶段 B2 询�
 6. 错误处理：所有失败必须带 `error_code`（`{error_prefix}-{MODULE}-{NNNN}`）+ `stage` + `request_id`。
 7. 更新 `dev-plan.md` 时只能使用 Edit 对目标行做单行替换，禁止使用 Write 重写整个文件。
 8. 依赖用于决定顺序和传递风险，不用于中断整个批次。上游任务未通过时，下游任务仍继续执行，但必须在下游 prompt 中说明依赖风险，并要求 tester 额外验证集成假设。
-9. **提交是任务的收口**：判定完成（✅ / ⚠️ / ❌）后立即运行 `commit_task.py` 提交，提交范围只用 developer 返回的修改文件路径；未提交不得取下一个任务。`push_policy = none`（不是仓库 / 无远端）时整条跳过，不产生任何 commit。
-10. **推送策略先定后跑**：planner 完成后、启动第一个 dev 之前，必须询问用户选 `逐任务推送` 还是 `批次末统一推送`，并把选择写入 `run.json` 的 `push_policy`。选定后按策略执行，不中途自行改策略，也绝不自动 `git init`。
-11. **不做破坏性 git 操作**：不用 `--amend`、不 `reset --hard`、不 `push --force`、不跳过 hook。`push_task.py` 返回 `BLOCKED`（远端领先）时停手报告，交给用户决定。
+9. **task0 不进循环**：`dev-plan.md` 里的 `task0` 是 planner 的前置工作（规划文档 / 脚手架），状态恒为 `✅`。它永不启动 dev / tester、永不提交、不产生测试报告，取任务时直接跳过；`commit_task.py --task task0` 会被脚本拒绝。
+10. **提交是任务的收口**：判定完成（✅ / ⚠️ / ❌）后立即运行 `commit_task.py` 提交，提交范围只用 developer 返回的修改文件路径；未提交不得取下一个任务。`push_policy = none`（不是仓库 / 无远端）时整条跳过，不产生任何 commit。
+11. **推送策略先定后跑**：planner 完成后、启动第一个 dev 之前，必须询问用户选 `逐任务推送` 还是 `批次末统一推送`，并把选择写入 `run.json` 的 `push_policy`。选定后按策略执行，不中途自行改策略，也绝不自动 `git init`。
+12. **不做破坏性 git 操作**：不用 `--amend`、不 `reset --hard`、不 `push --force`、不跳过 hook。`push_task.py` 返回 `BLOCKED`（远端领先）时停手报告，交给用户决定。
 
 ## 时间获取规范（强制）
 
@@ -223,7 +225,7 @@ git -C {project_root} remote -v                           # 有没有配置远�
 ## 任务循环（每任务走一遍，全部串行）
 
 ```
-[主智能体] 读取 DEV_PLAN 找到下一个 ⏳ 任务
+[主智能体] 读取 DEV_PLAN 找到下一个 ⏳ 任务（task0 恒为 ✅，自动跳过）
    |
    v
 ═══ 开发（1 个 dev Agent = 1 个任务，新 ID）═══

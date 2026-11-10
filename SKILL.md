@@ -5,7 +5,7 @@ license: MIT
 metadata:
   display_name: "多智能体协同开发"
   display_name_en: "Super Agent"
-  version: "0.0.6"
+  version: "0.0.7"
   category: "development"
   platforms: ["Windows", "macOS", "Linux"]
   author: "super-mortal"
@@ -172,6 +172,7 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 最终报告 | 全部任务结束后填写 `{run_root}/final-report.md`；聊天给计数汇总、报告路径与推送状态；batch-end 策略下附待推清单并询问是否推送 |
 | 高轮次失败 | 第 3 轮 FAIL 后，resume developer 时必须先查 Context7；不覆盖时用 Firecrawl 查官方资料，禁止猜测 |
 | 错误码断言 | 测试用例必须断言 error_code（不能只验 HTTP 状态码） |
+| 任务编号 | `task0` 固定为 planner 的前置工作（规划文档 / 脚手架），永不进 dev/test 循环、永不提交、不产生测试报告；开发任务从 `task1` 起全局连续编号，`taskN` 即 git log 里的第 N 条提交 |
 | 提交时机 | 每个任务判定完成、标记 dev-plan 之后，取下一个任务之前；三态都要提交，漏提交不得推进（`push_policy = none` 时整套 git 跳过，不提交） |
 | 提交范围 | 只用 developer 返回的修改文件路径（`commit_task.py --path`）；`.super-agent/` 过程产物不入库 |
 | 提交消息 | 只有一行：`taskN: 标题` / `taskN [未通过]: 标题` / `taskN [未能判定]: 标题`，由 `commit_task.py` 统一生成，标题原样取自 dev-plan；**不写 test-rounds / test-report / run 正文** |
@@ -348,3 +349,4 @@ python {skill_root}/scripts/estimate_context.py
 7. 批次结束后是否先询问用户、未经确认不得推送，以及无 git 仓库时是否整套跳过
 8. 计划完成后、循环开始前是否询问推送策略，逐任务策略下是否每任务提交后立即推送
 9. 环境里被注入 `GIT_COMMITTER_NAME=trae-solo-agent` 时，加载阶段是否询问了三选一、是否按用户选择记录并在下批次跳过询问
+10. planner 生成的计划是否把 P0 前置工作编为 `task0`、开发任务从 `task1` 起编号，且 `task0` 不进 dev/test 循环、不提交
