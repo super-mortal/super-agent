@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="heroTitle heroDesc">
+  <title id="heroTitle">Super Agent — 多智能体协同开发 skill</title>
+  <desc id="heroDesc">左侧是项目名与一句话说明：让 AI 按计划、独立审查、开发、测试、修正的流程推进项目，每一步都落盘成文件。右侧是一次真实批次的运行看板，列出五个阶段的进度、审查结论与最近一次提交。</desc>
+
+  <rect width="1200" height="400" fill="#0B0F14"/>
+
+  <g id="identity">
+    <text x="64" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" letter-spacing="2.4" fill="#7D8590">AI AGENT SKILL · v0.0.8</text>
+
+    <text x="64" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="66" font-weight="500" fill="#E6EDF3">Super Agent</text>
+
+    <text x="64" y="204" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#A9B4C0">让 AI 按工程化流程推进项目，</text>
+    <text x="64" y="234" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#A9B4C0">每一步判断都落盘成文件。</text>
+
+    <text x="64" y="284" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#E3B341">计划 → 独立审查 → 开发 → 测试 → 修正</text>
+
+    <text x="64" y="332" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">6 agents · 8 scripts · 34 evals · MIT</text>
+  </g>
+
+  <g id="live-run">
+    <rect x="700" y="64" width="440" height="272" rx="12" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+
+    <text x="724" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#7D8590">run</text>
+    <text x="762" y="98" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#C9D1D9">pocketnote-2026-09-10--01</text>
+
+    <line x1="724" y1="116" x2="1116" y2="116" stroke="#232A33" stroke-width="1"/>
+
+    <circle cx="729" cy="138" r="4" fill="#3FB950"/>
+    <text x="748" y="144" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">A</text>
+    <text x="790" y="144" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#C9D1D9">init</text>
+    <text x="944" y="144" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">batch created</text>
+
+    <circle cx="729" cy="172" r="4" fill="#3FB950"/>
+    <text x="748" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">B</text>
+    <text x="790" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#C9D1D9">plan</text>
+    <text x="944" y="178" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">24 tasks</text>
+
+    <circle cx="729" cy="206" r="4" fill="#3FB950"/>
+    <text x="748" y="212" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">B2</text>
+    <text x="790" y="212" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#C9D1D9">plan-review</text>
+    <text x="944" y="212" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">PASS · 2 rounds</text>
+
+    <circle cx="729" cy="240" r="4" fill="#3FB950"/>
+    <text x="748" y="246" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">B3</text>
+    <text x="790" y="246" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#C9D1D9">push</text>
+    <text x="944" y="246" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">per-task</text>
+
+    <circle cx="729" cy="274" r="4" fill="#E3B341"/>
+    <text x="748" y="280" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">C</text>
+    <text x="790" y="280" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#C9D1D9">task loop</text>
+    <text x="944" y="280" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#E3B341">07 / 24 running</text>
+
+    <line x1="724" y1="300" x2="1116" y2="300" stroke="#232A33" stroke-width="1"/>
+
+    <text x="724" y="322" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">16.30 tester PASS task7 · committed a1b2c3d</text>
+  </g>
+</svg>

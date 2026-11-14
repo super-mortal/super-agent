@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600" role="img" aria-labelledby="wfTitle wfDesc">
+  <title id="wfTitle">Super Agent 工作流：初始化、计划、计划审查、推送策略、任务循环</title>
+  <desc id="wfDesc">四个入口阶段串行执行，计划审查失败时回到计划阶段修正再复审，最多两轮。之后进入任务循环：开发、测试、判定、修正，每个任务走一遍，最多五轮测试。最后进入总结与推送。</desc>
+
+  <defs>
+    <marker id="wf-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#5A6472" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <marker id="wf-arrow-warn" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M2 1L8 5L2 9" fill="none" stroke="#E3B341" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="600" fill="#0B0F14"/>
+
+  <text x="64" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="34" font-weight="500" fill="#E6EDF3">一次开发任务的完整链路</text>
+  <text x="64" y="90" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">严格串行 · 每个判断都落盘成文件</text>
+
+  <g id="stage-a">
+    <rect x="64" y="118" width="236" height="84" rx="10" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+    <text x="84" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">A</text>
+    <text x="84" y="174" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#E6EDF3">项目初始化</text>
+    <text x="84" y="194" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">建批次 · 查身份</text>
+  </g>
+
+  <line x1="300" y1="160" x2="336" y2="160" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+  <g id="stage-b">
+    <rect x="344" y="118" width="236" height="84" rx="10" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+    <text x="364" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">B</text>
+    <text x="364" y="174" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#E6EDF3">计划生成</text>
+    <text x="364" y="194" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">dev-plan · dev-spec</text>
+  </g>
+
+  <line x1="580" y1="160" x2="616" y2="160" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+  <g id="stage-b2">
+    <rect x="624" y="118" width="236" height="84" rx="10" fill="#161C16" stroke="#3E4A2A" stroke-width="1"/>
+    <text x="644" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#8A9A63">B2</text>
+    <text x="644" y="174" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#E6EDF3">计划独立审查</text>
+    <text x="644" y="194" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#A9B4C0">读需求 · 扫代码</text>
+  </g>
+
+  <line x1="860" y1="160" x2="896" y2="160" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+  <g id="stage-b3">
+    <rect x="904" y="118" width="236" height="84" rx="10" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+    <text x="924" y="146" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">B3</text>
+    <text x="924" y="174" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#E6EDF3">推送策略</text>
+    <text x="924" y="194" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#8B949E">必须明确选 · 无默认</text>
+  </g>
+
+  <path d="M742 202 L742 246 L462 246 L462 218" fill="none" stroke="#E3B341" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#wf-arrow-warn)"/>
+  <text x="470" y="272" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#E3B341">FAIL · resume 同一 planner 改计划 → 复审（≤2 轮）</text>
+
+  <path d="M1022 202 L1022 304" fill="none" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+  <g id="stage-c">
+    <rect x="64" y="310" width="1076" height="190" rx="12" fill="#0F141A" stroke="#2B333D" stroke-width="1"/>
+    <text x="88" y="346" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">C</text>
+    <text x="112" y="346" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="21" fill="#E6EDF3">任务循环</text>
+    <text x="224" y="346" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#6E7681">每个任务走一遍 · 最多 5 轮测试</text>
+
+    <g id="loop-dev">
+      <rect x="88" y="372" width="150" height="68" rx="8" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+      <text x="104" y="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#E6EDF3">dev</text>
+      <text x="104" y="424" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="17" fill="#8B949E">新 Agent</text>
+    </g>
+
+    <line x1="238" y1="406" x2="270" y2="406" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+    <g id="loop-tester">
+      <rect x="274" y="372" width="150" height="68" rx="8" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+      <text x="290" y="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#E6EDF3">tester</text>
+      <text x="290" y="424" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="17" fill="#8B949E">新 Agent · 只读</text>
+    </g>
+
+    <line x1="424" y1="406" x2="456" y2="406" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+    <g id="loop-judge">
+      <rect x="460" y="372" width="150" height="68" rx="8" fill="#12171E" stroke="#2B333D" stroke-width="1"/>
+      <text x="476" y="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17" fill="#E6EDF3">grep 判定</text>
+      <text x="476" y="424" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="17" fill="#8B949E">PASS / FAIL</text>
+    </g>
+
+    <line x1="610" y1="406" x2="642" y2="406" stroke="#5A6472" stroke-width="1.6" marker-end="url(#wf-arrow)"/>
+
+    <g id="loop-fix">
+      <rect x="646" y="372" width="150" height="68" rx="8" fill="#1A1710" stroke="#4A3F22" stroke-width="1"/>
+      <text x="662" y="400" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="17" fill="#E6EDF3">修正循环</text>
+      <text x="662" y="424" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#E3B341">resume 同 ID</text>
+    </g>
+
+    <path d="M720 440 L720 474 L163 474 L163 452" fill="none" stroke="#E3B341" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#wf-arrow-warn)"/>
+    <text x="740" y="490" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#E3B341">FAIL</text>
+
+    <text x="856" y="400" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="18" fill="#8B949E">通过后提交，再取下一个 →</text>
+    <text x="856" y="426" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">D 总结 · 推送收口</text>
+  </g>
+
+  <text x="64" y="548" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="18" fill="#6E7681">没有静默跳过：判定写成报告，审查写成报告，提交写进 git log。</text>
+</svg>

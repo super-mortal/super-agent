@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="344" viewBox="0 0 1200 344" role="img" aria-labelledby="ledTitle ledDesc">
+  <title id="ledTitle">一次运行留下的批次目录与主日志</title>
+  <desc id="ledDesc">左侧是批次目录结构：计划、计划审查、测试报告、日志与最终报告。右侧是主智能体日志片段，记录了任务启动、开发完成、测试通过、任务完成与提交哈希。</desc>
+
+  <rect width="1200" height="344" fill="#0B0F14"/>
+
+  <text x="64" y="56" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="30" font-weight="500" fill="#E6EDF3">一次运行留下什么</text>
+  <text x="64" y="86" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">.super-agent/runs/&lt;项目名-日期--批次号&gt;/</text>
+
+  <line x1="64" y1="106" x2="1136" y2="106" stroke="#232A33" stroke-width="1"/>
+
+  <g id="tree" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="17">
+    <text x="64" y="146" fill="#E6EDF3">runs/pocketnote-2026-09-10--01/</text>
+
+    <text x="64" y="180" fill="#5A6472">├──</text>
+    <text x="104" y="180" fill="#C9D1D9">plan/</text>
+    <text x="316" y="180" fill="#6E7681">dev-plan · dev-spec</text>
+
+    <text x="64" y="214" fill="#5A6472">├──</text>
+    <text x="104" y="214" fill="#C9D1D9">plan-reviews/</text>
+    <text x="316" y="214" fill="#8A9A63">plan-review.md  PASS · 2 rounds</text>
+
+    <text x="64" y="248" fill="#5A6472">├──</text>
+    <text x="104" y="248" fill="#C9D1D9">test-reports/</text>
+    <text x="316" y="248" fill="#6E7681">task7-p2-history-test-report.md</text>
+
+    <text x="64" y="282" fill="#5A6472">├──</text>
+    <text x="104" y="282" fill="#C9D1D9">logs/</text>
+    <text x="316" y="282" fill="#6E7681">main-log.md</text>
+
+    <text x="64" y="316" fill="#5A6472">└──</text>
+    <text x="104" y="316" fill="#C9D1D9">final-report.md</text>
+    <text x="316" y="316" fill="#6E7681">PASS 23 · 未通过 1 · 阻塞 0</text>
+  </g>
+
+  <g id="log">
+    <rect x="620" y="126" width="516" height="190" rx="10" fill="#0F141A" stroke="#2B333D" stroke-width="1"/>
+
+    <text x="644" y="152" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">logs/main-log.md</text>
+    <line x1="644" y1="164" x2="1112" y2="164" stroke="#232A33" stroke-width="1"/>
+
+    <text x="644" y="190" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">16.04</text>
+    <text x="712" y="190" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="16" fill="#A9B4C0">启动 developer task1</text>
+
+    <text x="644" y="216" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">16.30</text>
+    <text x="712" y="216" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="16" fill="#A9B4C0">developer 完成 task1：history.py</text>
+
+    <text x="644" y="242" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">17.00</text>
+    <text x="712" y="242" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="16" fill="#A9B4C0">tester PASS task1</text>
+
+    <text x="644" y="268" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">17.01</text>
+    <text x="712" y="268" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">── task1 完成 ──</text>
+
+    <text x="644" y="294" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" fill="#6E7681">17.01</text>
+    <text x="712" y="294" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif" font-size="16" fill="#E3B341">提交 task1（PASS）：a1b2c3d</text>
+  </g>
+</svg>
