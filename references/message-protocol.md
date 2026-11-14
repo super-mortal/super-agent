@@ -104,6 +104,18 @@ planner 完成
 共 {N} 个阶段任务
 ```
 
+（被 resume 修计划时，改为返回计划路径 + 修正摘要 + 任务总数，见下方模板。）
+
+### plan-reviewer 返回
+
+```
+plan-reviewer {PASS|FAIL}
+报告路径：{run_root}/plan-reviews/plan-review.md
+阻塞问题数：{N}（仅 FAIL 时填写）
+建议条数：{M}（PASS / FAIL 都填）
+失败摘要：{一句话，仅 FAIL 时填写}
+```
+
 ### grader 返回
 
 ```
@@ -135,11 +147,139 @@ agent_return | grep "^- " | head -30
 agent_return | grep "^pass_rate："
 ```
 
+计划审查阶段：
+
+```bash
+# 提取 plan-reviewer 的 PASS/FAIL
+agent_return | grep -E "^plan-reviewer (PASS|FAIL)"
+
+# 提取审查报告路径、阻塞问题数与建议条数
+agent_return | grep -E "^(报告路径|阻塞问题数|建议条数)："
+
+# 提取 planner 修计划后的任务总数
+agent_return | grep "^共 "
+```
+
 不读完整返回内容，避免上下文污染。
 
 ### 路径优先
 
 所有跨智能体的信息传递都用**绝对路径**，不用相对路径、不用 URL 短链、不用 base64 编码内容。
+
+## 计划审查的 prompt 模板
+
+### 首审（新启动）
+
+```
+Agent(
+  subagent_type: "plan-reviewer",
+  prompt: "独立审查开发计划是否成立。
+
+═══════════════════════════════════════
+任务信息
+═══════════════════════════════════════
+项目：{project_name}
+批次：{run_id}
+审查轮次：第 1 轮（首审）
+需求文档章节数：{M}（来自 requirements.md）
+
+═══════════════════════════════════════
+必读文件路径（按顺序）
+═══════════════════════════════════════
+1. {DEV_DOC}                      ← 需求文档，必须完整读
+2. {DEV_PLAN}
+3. {REQUIREMENTS}
+4. {DEV_SPEC}
+5. {skill_root}/references/task-decomposition.md
+
+═══════════════════════════════════════
+代码现状
+═══════════════════════════════════════
+项目根目录：{project_root}
+请自行扫描目录结构、依赖清单、入口文件、表/模型定义、现有命名与错误码约定；
+最多读 10 个项目文件，只看结构与接口签名，不深读业务实现。
+若项目为空（greenfield），在报告中写明并按需求依赖关系审查顺序。
+
+═══════════════════════════════════════
+输出要求
+═══════════════════════════════════════
+1. 写审查报告到 {run_root}/plan-reviews/plan-review.md
+2. 报告结构：`## 第 1 次审查` + 独立一行 `### 判定：PASS` 或 `### 判定：FAIL`
+3. 返回内容严格按以下格式：
+
+plan-reviewer {PASS|FAIL}
+报告路径：{绝对路径}
+阻塞问题数：{N}
+建议条数：{M}
+失败摘要：{一句话}
+
+═══════════════════════════════════════
+绝对禁止
+═══════════════════════════════════════
+- ❌ 修改 dev-plan / dev-spec / requirements / 任何业务代码
+- ❌ 只读计划不读需求文档就下判定
+- ❌ 用建议项凑 FAIL，或放过阻塞项
+- ❌ 在返回内容里贴问题表或代码
+"
+)
+```
+
+### 修计划（resume planner）
+
+```
+Agent(
+  subagent_type: "planner",
+  resume: "{planner_agent_id}",        # 关键：同一计划作者
+  prompt: "按审查报告修正开发计划。
+
+审查报告：{run_root}/plan-reviews/plan-review.md（读最新一段）
+失败摘要：{一句话}
+审查轮次：第 {N} 轮
+
+修正要求：
+1. 逐条解决标注为「阻塞」的问题；建议项可采纳可不采纳
+2. 优先补任务 / 补依赖 / 补章节映射，而不是推倒重排
+3. 允许重排与重编号（尚未提交任何任务），但改编号必须同步依赖列与 requirements.md
+4. task0 保持 ✅、不入库
+5. 在 dev-plan 备注追加一行：- {时间} 按第 N 轮审查修正：{一句话}
+
+返回：
+planner 完成
+产出文件：
+- {dev-plan 路径}
+共 {N} 个开发任务（task1 ~ task{N}）
+修正摘要：{一句话}
+"
+)
+```
+
+### 复审（resume plan-reviewer）
+
+```
+Agent(
+  subagent_type: "plan-reviewer",
+  resume: "{reviewer_agent_id}",       # 关键：同一审查者，保留核销上下文
+  prompt: "复审修正后的开发计划。
+
+审查轮次：第 2 轮（复审）
+同一个审查报告：{run_root}/plan-reviews/plan-review.md
+上一轮失败摘要：{一句话}
+
+要求：
+1. 逐条核销上一轮每条阻塞项（✅ 已解决 / ❌ 未解决 / ➖ 已不适用）
+2. 检查修改是否引入新的顺序或依赖问题（新增/拆分任务最常见）
+3. 追加 `## 第 2 次审查（复审）` 段，不覆盖旧段
+4. 报告新的 PASS/FAIL
+
+返回：
+plan-reviewer {PASS|FAIL}
+报告路径：{绝对路径}
+阻塞问题数：{N}
+建议条数：{M}
+失败摘要：{一句话}
+"
+)
+```
 
 ## 修正循环的 prompt 模板
 
@@ -229,7 +369,7 @@ Agent(
 | 上一轮失败摘要（agent 自己写的总结） | ✅ 传 |
 | 失败细节（测试报告全文） | ❌ 不传（让 agent 自己读） |
 | 业务代码内容 | ❌ 不传（agent 自己读） |
-| 完整需求文档 | ❌ 不传（agent 自己读） |
+| 完整需求文档 | ❌ 不传（agent 自己读）；**唯一例外**是 plan-reviewer，它拿路径后必须完整读一遍才能判断漏没漏需求 |
 | 错误码完整定义 | ✅ 传（在 dev-spec.md 里，路径传） |
 
 ## 协议不变性
@@ -238,7 +378,7 @@ Agent(
 
 - 不同项目（视频下载工具 / 博客 / 电商等）— 模板不变，占位符替换
 - 不同阶段（P0 / P1 / P6）— 模板不变，只改 `title` 和 `必读路径`
-- 不同子智能体（developer / tester / planner）— 每种 role 一份固定 prompt 模板
+- 不同子智能体（plan-reviewer / developer / tester / planner）— 每种 role 一份固定 prompt 模板
 
 只在以下情况调整：
 

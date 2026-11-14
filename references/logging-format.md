@@ -27,6 +27,11 @@ python {skill_root}/scripts/now.py
 | 阶段切换 | `- 2026-09-08 15.31 ── 阶段 A 完成 ──` |
 | 子智能体启动 | `- 2026-09-08 15.32 启动 planner (ID: planner-2026-09-08-15.32)` |
 | 子智能体完成 | `- 2026-09-08 15.40 planner 完成：dev-plan / dev-spec / 骨架已生成 (ID: planner-2026-09-08-15.32)` |
+| 计划审查启动 | `- 2026-09-08 15.41 启动 plan-reviewer 第 1 轮 (ID: plan-reviewer-2026-09-08-15.41)` |
+| 计划审查 PASS | `- 2026-09-08 15.50 plan-reviewer PASS 第 1 轮（24 个任务，2 条建议）(ID: plan-reviewer-2026-09-08-15.41)` |
+| 计划审查 FAIL | `- 2026-09-08 15.50 plan-reviewer FAIL 第 1 轮：task3 依赖倒置 + §4.3 无任务承接 (ID: plan-reviewer-2026-09-08-15.41)` |
+| 计划修正 | `- 2026-09-08 15.56 resume planner 修正计划：task3 依赖改为 task2，新增 task9 (ID: planner-2026-09-08-15.32)` |
+| 计划审查用尽 | `- 2026-09-08 16.10 计划审查 2 轮仍 FAIL，已停下询问用户（阻塞项 2 条）` |
 | 任务开始 | `- 2026-09-08 15.42 启动 developer task1 (ID: developer-2026-09-08-15.42)` |
 | dev 完成 | `- 2026-09-08 16.00 developer 完成 task1：history.py / migrations (ID: developer-2026-09-08-15.42)` |
 | tester 完成 PASS | `- 2026-09-08 16.30 tester PASS task1 (ID: tester-2026-09-08-16.02)` |
@@ -52,8 +57,13 @@ python {skill_root}/scripts/now.py
 - 2026-09-08 15.30 项目启动，当前阶段 = 阶段 A
 - 2026-09-08 15.32 启动 planner (ID: planner-2026-09-08-15.32)
 - 2026-09-08 15.40 planner 完成：dev-plan / dev-spec / 骨架已生成 (ID: planner-2026-09-08-15.32)
-- 2026-09-08 15.41 ── 阶段 B 完成，进入阶段 C ──
-- 2026-09-08 15.42 启动 developer task1 (ID: developer-2026-09-08-15.42)
+- 2026-09-08 15.41 启动 plan-reviewer 第 1 轮 (ID: plan-reviewer-2026-09-08-15.41)
+- 2026-09-08 15.56 plan-reviewer FAIL 第 1 轮：task3 依赖倒置 (ID: plan-reviewer-2026-09-08-15.41)
+- 2026-09-08 15.58 resume planner 修正计划：task3 依赖改为 task2 (ID: planner-2026-09-08-15.32)
+- 2026-09-08 16.05 plan-reviewer PASS 第 2 轮（25 个任务）(ID: plan-reviewer-2026-09-08-15.41)
+- 2026-09-08 16.06 推送策略 = batch-end（用户选择）
+- 2026-09-08 16.07 ── 阶段 B 完成，进入阶段 C ──
+- 2026-09-08 16.08 启动 developer task1 (ID: developer-2026-09-08-16.08)
 - 2026-09-08 16.00 developer 完成 task1：history.py / migrations (ID: developer-2026-09-08-15.42)
 - 2026-09-08 16.02 启动 tester task1 (ID: tester-2026-09-08-16.02)
 - 2026-09-08 16.30 tester FAIL task1：错误码 {PREFIX}-PARSE-0002 断言不通过 (ID: tester-2026-09-08-16.02)
@@ -74,7 +84,8 @@ python {skill_root}/scripts/now.py
 
 | 情形 | 写法 |
 |---|---|
-| 策略选定 | `- {时间} 推送策略 = {per-task / batch-end}（{用户选择 / 默认}）` |
+| 策略选定 | `- {时间} 推送策略 = {per-task / batch-end}（用户明确选择）` |
+| 策略未定 | `- {时间} 推送策略未选定，已重新询问用户` |
 | 无仓库 / 无远端 | `- {时间} 项目未启用 git（不是 git 仓库 / 无远端），跳过提交与推送`（每批次只记一次） |
 | 提交成功 | `- {时间} 提交 {taskN}（{PASS / 未通过 / 未能判定}）：{hash}` |
 | 身份策略 | `- {时间} 提交身份 = user（本项目以后都用我的，用户选择）` |

@@ -1,8 +1,10 @@
 display_name: super-agent
-short_description: 多智能体协同开发（严格串行）
+short_description: 多智能体协同开发（计划审查 + 严格串行）
 default_prompt: |
-  加载 super-agent skill。super-agent 是一个把"主智能体 + 4 类子智能体"协同开发流程封装成可复用 skill 的工具。
+  加载 super-agent skill。super-agent 是一个把"主智能体 + 5 类子智能体"协同开发流程封装成可复用 skill 的工具。
   核心约束：所有智能体调用必须严格串行（包括测试子代理之间），主智能体不直接修改业务代码。
+  流程：planner 出计划 → plan-reviewer 独立审查计划（需求覆盖 + 任务顺序 + 真实代码现状）→ 推送策略确认 → 逐任务开发/测试/修正。
+  计划审查最多 2 轮，第 2 轮仍 FAIL 必须停下问用户，不得自行放行开工。
   适用：长期、可追溯、有审查的开发任务。
   不适用：一次性小修改、强耦合无法独立验证的任务。
 

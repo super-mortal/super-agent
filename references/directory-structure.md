@@ -21,6 +21,8 @@
             │   └── {role}-{YYYY-MM-DD}.log   子智能体日志（可选）
             ├── test-reports/
             │   └── {taskN}-{pN}-{module}-test-report.md
+            ├── plan-reviews/
+            │   └── plan-review.md      计划独立审查报告（多轮追加段）
             └── references/             （可选）项目级只读参考
 ```
 
@@ -112,7 +114,6 @@ Context7 / Firecrawl 抓官方文档的结论记录。子智能体抓完协议�
 写入前必须运行 `python {skill_root}/scripts/now.py` 获取北京时间。
 
 ### `.super-agent/runs/{run-id}/test-reports/{taskN}-{pN}-{module}-test-report.md`
-
 测试 Agent 输出的报告。只由 tester 写入，developer 不写这个目录。一个任务固定一个报告文件，重测继续追加到原文件，不创建轮次文件。
 
 文件名规则：
@@ -125,6 +126,15 @@ Context7 / Firecrawl 抓官方文档的结论记录。子智能体抓完协议�
 示例：`task7-p2-history-test-report.md`。
 
 重测时**追加新轮次段落**，不覆盖旧内容，不修改文件名，也不创建 `task7-p2-history-test-report-2.md` 之类的文件。
+
+### `.super-agent/runs/{run-id}/plan-reviews/plan-review.md`
+
+计划独立审查报告。只由 plan-reviewer 写入，planner 和主智能体都不写这个文件（planner 只改 dev-plan，主智能体只 grep 判定）。
+
+- 一个批次固定**一个**文件，首审创建、复审追加 `## 第 N 次审查` 段，不覆盖、不改名、不创建 `-2` 文件。
+- 判定协议与测试报告完全一致（`### 判定：PASS/FAIL` 独立标题行），因此 `grep_judgement.py --strict` 可直接复用。
+- 报告内容：七维度问题表（严重度 / 维度 / 位置任务 / 问题 / 建议）、需求覆盖对照表、结论。
+- 阻塞项 ≥ 1 才判 `FAIL`；只有建议项时判 `PASS`，建议仍写进报告供事后参考。
 
 ## 初始化（自动）
 
@@ -144,7 +154,8 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 - `.super-agent/runs/<run-id>/plan/` 下 5 个文件（基于 `assets/*.md` 模板）
 - `.super-agent/runs/<run-id>/logs/` 下 1 个空文件
 - `.super-agent/runs/<run-id>/test-reports/` 空目录
-- 可选更新 `.gitignore`，忽略批次日志和测试报告（提交流程本来也不会纳入 `.super-agent/`，
+- `.super-agent/runs/<run-id>/plan-reviews/` 空目录（计划审查报告由 plan-reviewer 首次创建）
+- 可选更新 `.gitignore`，忽略批次日志、测试报告与计划审查报告（提交流程本来也不会纳入 `.super-agent/`，
   此选项是为了让 `git status` 保持干净）
 
 脚本每次只创建新批次；同一天通过 `--01`、`--02` 递增避免覆盖旧数据。
@@ -157,6 +168,9 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 {
   "run_id": "pocketnote-2026-09-10--01",
   "status": "running",
+  "plan_review": null,
+  "plan_review_rounds": null,
+  "plan_review_report": null,
   "push_policy": "batch-end",
   "push_policy_confirmed_at": "2026-09-10T10:05:00+08:00",
   "identity_policy": "user",
@@ -171,10 +185,22 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 
 | 值 | 含义 |
 |---|---|
-| `null` | 尚未询问（初始化后、阶段 B2 之前） |
+| `null` | 尚未询问，或用户尚未明确选择（阶段 B3 之前 / 询问未得到明确回答） |
 | `per-task` | 每个任务提交后立即推送 |
-| `batch-end` | 只在批次末尾统一推送（默认） |
+| `batch-end` | 只在批次末尾统一推送（用户明确选择） |
 | `none` | 未启用 git：项目不是 git 仓库，或没有配置远端；不提交也不推送 |
+
+`plan_review` 取值：
+
+| 值 | 含义 |
+|---|---|
+| `null` | 计划已生成但尚未审查（阶段 B2 之前 / 待审查） |
+| `passed` | plan-reviewer 判定 PASS（含复审通过） |
+| `waived` | 第 2 轮仍 FAIL，用户明确选择接受风险开工 |
+| `pending-user` | 第 2 轮仍 FAIL，已停下等用户决定（A 手工调整 / B 放行 / C 停止） |
+
+`plan_review_rounds` 记录已执行的审查轮数，`plan_review_report` 指向审查报告路径。
+`plan_review` 为 `null` / `pending-user` 时**不得启动任何 dev**。
 
 `identity_policy` 只在用户选择「本轮用我自己的身份」时写入（取值 `user`）；
 持久选择（A/C）存在项目级 `.super-agent/preferences.json`，不写进 `run.json`。
@@ -193,6 +219,7 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 - `.super-agent/runs/<run-id>/final-report.md`（全部任务结束后填写批次汇总）
 - `.super-agent/runs/<run-id>/logs/main-log.md`（追加日志）
 - `.super-agent/runs/<run-id>/test-reports/`（让子智能体自己写，主智能体只读判定行）
+- `.super-agent/runs/<run-id>/plan-reviews/`（让 plan-reviewer 自己写，主智能体只读判定行）
 
 主智能体**不编辑**：
 
@@ -200,13 +227,15 @@ python {skill_root}/scripts/init_workspace.py /path/to/project \
 - `.super-agent/runs/<run-id>/plan/dev-spec.md`（由 planner 生成）
 - `.super-agent/runs/<run-id>/plan/lessons-learned.md`（由 developer 追加）
 - `.super-agent/runs/<run-id>/plan/context7-record.md`（由子智能体追加）
+- `.super-agent/runs/<run-id>/plan-reviews/plan-review.md`（由 plan-reviewer 写，主体不得代写或改写判定）
 
 | 角色 | 能写 | 不能写 |
 |---|---|---|
-| planner | dev-plan / dev-spec / requirements / 模板文件 | 业务代码、tester 报告 |
+| planner | dev-plan / dev-spec / requirements / 模板文件 | 业务代码、tester 报告、plan-reviews 报告 |
+| plan-reviewer | plan-reviews/plan-review.md | 业务代码、dev-plan、dev-spec、requirements、test-reports |
 | developer | 业务代码、lessons-learned、context7-确认记录、通过脚本登记错误码 | test-reports、手工编辑 dev-plan/dev-spec |
 | tester | test-reports | 业务代码、dev-plan、lessons-learned |
-| 主智能体 | run.json、final-report.md、dev-plan 状态、main-log | 业务代码、tester 报告正文、plan 其他文档 |
+| 主智能体 | run.json、final-report.md、dev-plan 状态、main-log | 业务代码、tester 报告正文、plan-reviews 正文、plan 其他文档 |
 | grader | benchmark.json | 业务代码、其他任何 |
 
 ## 与项目业务目录的关系

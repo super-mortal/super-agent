@@ -122,6 +122,9 @@ def write_run_metadata(run_root: Path, project_root: Path, project_name: str, er
         "error_prefix": error_prefix,
         "timezone": "Asia/Shanghai",
         "status": "running",
+        "plan_review": None,
+        "plan_review_rounds": None,
+        "plan_review_report": None,
         "push_policy": None,
         "push_policy_confirmed_at": None,
         "identity_policy": None,
@@ -148,6 +151,7 @@ def update_gitignore(project_root: Path) -> None:
     additions = [
         ".super-agent/runs/*/logs/",
         ".super-agent/runs/*/test-reports/",
+        ".super-agent/runs/*/plan-reviews/",
     ]
     if gi.exists():
         content = gi.read_text(encoding="utf-8")
@@ -206,6 +210,7 @@ def main() -> int:
     plan_dir = run_root / "plan"
     logs_dir = run_root / "logs"
     reports_dir = run_root / "test-reports"
+    reviews_dir = run_root / "plan-reviews"
 
     write_run_metadata(run_root, project_root, project_name, error_prefix)
 
@@ -244,11 +249,18 @@ def main() -> int:
     reports_dir.mkdir(parents=True, exist_ok=True)
     print(f"  DIR   {reports_dir}")
 
+    reviews_dir.mkdir(parents=True, exist_ok=True)
+    print(f"  DIR   {reviews_dir}")
+
     if args.gitignore:
         update_gitignore(project_root)
 
     print()
-    print(f"Next: 主智能体读取 {plan_dir / 'dev-plan.md'} 开始阶段循环。")
+    print(
+        f"Next: 主智能体启动 planner 生成 {plan_dir / 'dev-plan.md'}，"
+        f"由 plan-reviewer 写 {reviews_dir / 'plan-review.md'} 并判定 PASS（或用户接受风险）后，"
+        f"先确认推送策略（阶段 B3，无默认值），再进任务循环。"
+    )
     return 0
 
 

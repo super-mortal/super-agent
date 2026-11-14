@@ -1,16 +1,16 @@
 ---
 name: super-agent
-description: "把「多智能体协同开发」封装成可复用的工作流：主智能体（编排者）+ 计划智能体 + 开发智能体 + 测试智能体 协作完成需求拆解、开发、测试与修正循环。提供：开箱即用的角色剧本（agents/）、标准化消息协议与日志格式（references/）、一键初始化脚本（scripts/init_workspace.py，按运行批次隔离目录）、让用户在新会话里「加载主智能体 → 跑完整循环」。触发场景（任意一条即触发）：用户说「用多智能体协同开发」、「按敏捷 agent 循环来开发」、「按主智能体方法论来开发」；用户给出需求文档，要求「按规范拆任务、逐任务开发、自动测试」；用户说「用 orchestrator + dev + tester 协作开发」；用户给出 dev-plan.md 模板并要求「按这个计划调度子智能体」；用户希望「修 bug 时复用原 Agent、重测时复用原 tester」；用户希望「主智能体不直接开发，只调度和验收」。不触发的场景：用户只要做一次性小修改（agent 自己直接改就行）、只写代码片段（不需要多智能体协作）、只回答问题或解释概念。"
+description: "把「多智能体协同开发」封装成可复用的工作流：主智能体（编排者）+ 计划智能体 + 计划审查智能体 + 开发智能体 + 测试智能体 协作完成需求拆解、计划独立审查、开发、测试与修正循环。提供：开箱即用的角色剧本（agents/）、标准化消息协议与日志格式（references/）、一键初始化脚本（scripts/init_workspace.py，按运行批次隔离目录）、让用户在新会话里「加载主智能体 → 跑完整循环」。触发场景（任意一条即触发）：用户说「用多智能体协同开发」、「按敏捷 agent 循环来开发」、「按主智能体方法论来开发」；用户给出需求文档，要求「按规范拆任务、逐任务开发、自动测试」；用户说「用 orchestrator + dev + tester 协作开发」；用户给出 dev-plan.md 模板并要求「按这个计划调度子智能体」；用户希望「计划写完先独立审查一遍再开工」；用户希望「修 bug 时复用原 Agent、重测时复用原 tester」；用户希望「主智能体不直接开发，只调度和验收」。不触发的场景：用户只要做一次性小修改（agent 自己直接改就行）、只写代码片段（不需要多智能体协作）、只回答问题或解释概念。"
 license: MIT
 metadata:
   display_name: "多智能体协同开发"
   display_name_en: "Super Agent"
-  version: "0.0.7"
+  version: "0.0.8"
   category: "development"
   platforms: ["Windows", "macOS", "Linux"]
   author: "super-mortal"
   tags: ["multi-agent", "agent-workflow", "software-development"]
-  description_en: "Package multi-agent collaborative development into a reusable workflow — an orchestrator agent that only schedules, plus planner, developer and tester sub-agents running strictly serially through requirement breakdown, implementation, testing and a fix loop. Every artifact is written to disk under .super-agent/runs/<batch>/, and bug fixes resume the same agent to preserve context. Built for long-running, auditable development tasks that need independent review."
+  description_en: "Package multi-agent collaborative development into a reusable workflow — an orchestrator agent that only schedules, plus planner, plan-reviewer, developer and tester sub-agents running strictly serially through requirement breakdown, independent plan review, implementation, testing and a fix loop. The plan must pass an independent review (requirements coverage + task ordering against the real codebase) before any task starts. Every artifact is written to disk under .super-agent/runs/<batch>/, and bug fixes resume the same agent to preserve context. Built for long-running, auditable development tasks that need independent review."
 ---
 
 # Super Agent
@@ -19,17 +19,19 @@ metadata:
 
 ## 这个 skill 解决什么问题
 
-一次开发任务如果让单个 agent 从头做到尾，会遇到三个瓶颈：
+一次开发任务如果让单个 agent 从头做到尾，会遇到四个瓶颈：
 
 1. **上下文窗口爆炸**：长对话让注意力分散，模型记不住自己之前为什么这么写。
 2. **修 bug 失忆**：修复一个问题时，agent 已经忘了"我之前为什么这么写"、"测试报告里的具体 bug 是什么"。
 3. **测试与开发互相污染**：写代码的 agent 自己测自己的代码，缺少独立审查。
+4. **计划错了全盘返工**：计划作者自己检查计划，容易漏需求、把下游排在依赖它之前；等 write 到第 10 个任务才发现顺序倒置，前面 9 个都要重做。
 
-super-agent 用三角色 + 修正循环解这三个问题：
+super-agent 用四角色 + 修正循环解这四个问题：
 
 - **主智能体**只调度不开发，所有信息以"路径"形式传递，避免上下文污染。
+- **计划审查智能体**在开工前独立审查计划：读需求文档全文 + 扫真实代码结构，核对需求覆盖、任务顺序、依赖与粒度。
 - **开发智能体**和**测试智能体**角色分离，互相独立审查。
-- 修 bug 时 **resume 同一个开发 Agent**，重测时 **resume 同一个测试 Agent**，保留上下文。
+- 修 bug 时 **resume 同一个开发 Agent**，重测时 **resume 同一个测试 Agent**，修计划时 **resume 同一个 planner**，保留上下文。
 
 ## 核心约束：所有智能体调用必须串行
 
@@ -48,22 +50,26 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 7 | 跨 role 并行（如 backend-dev + frontend-dev 同时跑） | 不允许 |
 | 8 | 更新 `dev-plan.md` | 只能用 Edit 单行替换，禁止用 Write 覆盖整个文件 |
 | 9 | 任务判定完成 | 必须立即提交（`commit_task.py`），✅ / ⚠️ / ❌ 三态都要提交；未提交不得取下一个任务 |
-| 10 | 推送策略 | 计划完成后、任务循环开始前**必须**询问用户选哪种：`逐任务推送` 或 `批次末统一推送`；用户没明确回答时默认批次末 |
-| 11 | 推送执行 | 只在已选策略范围内执行 `git push -u origin {branch}`；远端领先（non-fast-forward）时停手问用户，永不 `--force`、永不 `reset --hard` |
+| 10 | 计划审查 | planner 完成后**必须**启动独立 plan-reviewer（新 ID，读需求文档全文 + 扫项目代码现状）；判定 PASS，或第 2 轮 FAIL 后用户明确选择接受风险（`waived`），才能启动第一个 dev |
+| 11 | 审查失败处理 | FAIL → resume 同一 planner 修计划、再 resume 同一 plan-reviewer 复审；最多 2 轮，第 2 轮仍 FAIL **必须**停下问用户（手工调整 / 接受风险 / 停止） |
+| 12 | 推送策略 | 计划审查通过后、任务循环开始前**必须**询问用户选哪种：`逐任务推送` 或 `批次末统一推送`；**无默认值**，用户未明确选择时不得推进（不启动 dev、不提交），重新询问或停下等待 |
+| 13 | 推送执行 | 只在已选策略范围内执行 `git push -u origin {branch}`；远端领先（non-fast-forward）时停手问用户，永不 `--force`、永不 `reset --hard` |
 
 ### 主智能体的强制行为清单
 
 - 每个任务只启动 **1 个 dev Agent**（新 ID）
 - 每个任务只启动 **1 个 tester**（新 ID）
+- planner 完成后必须启动 **1 个全新的 plan-reviewer**（新 ID，不能 resume planner，不能自己审）
 - 修 bug 时必须使用 **resume**（不是新启动）
+- 审查 FAIL 时 resume **同一 planner** 改计划、resume **同一 plan-reviewer** 复审；第 2 轮仍 FAIL 停下问用户
 - 下一个任务必须等待当前任务完全完成
 - 主智能体永不修改业务代码
-- 主智能体只运行 `grep_judgement.py --strict` 提取判定，不读报告全文
+- 主智能体只运行 `grep_judgement.py --strict` 提取判定，不读报告全文（测试报告、审查报告都一样）
 - 更新 `dev-plan.md` 只能 Edit 单行替换，禁止 Write 覆盖整个文件
 - 每个任务判定完成后立即运行 `commit_task.py` 提交，提交范围只用 developer 返回的修改文件路径（`push_policy = none` 时整套跳过）
-- planner 完成后、启动第一个 dev 之前，**必须先问用户推送策略**，并把选择写入 `run.json` 与 main-log
+- 计划审查 PASS（或用户明确要求接受风险）后、启动第一个 dev 之前，**必须先问用户推送策略**，并把选择写入 `run.json` 与 main-log
 - 逐任务推送模式下，每个任务提交成功后立即 `push_task.py --confirm`；批次末模式只在报告写完后问一次
-- 用户没明确回答策略时默认"批次末统一推送"，不得自行选择逐任务推送
+- 推送策略必须由用户明确选定，**没有默认值**；用户没回答或回答含糊时不得开工，重新询问，仍不明确就停下等待
 - 探活发现"不是 git 仓库"或"没有配置远端"时，直接整套跳过 git（不提交、不推送），不问策略
 - 按已记录的身份策略提交：`user` 剔除注入并强制用户身份，`ide` 保留注入让 IDE 署名；回读不符就停下问用户
 - 加载时若发现身份冲突且本项目无记录，必须询问用户三选一，不得替用户决定用谁的署名
@@ -78,6 +84,8 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 路径即接口 | 主智能体只拿文件路径，不读内容；子智能体收到路径后自己读 |
 | resume 同 ID | 修 bug resume 同开发 Agent；重测 resume 同测试 Agent；新任务开新 Agent |
 | 测试只读 | 测试 Agent 永不修改业务代码，只能写测试报告到当前批次的 `test-reports/`；一个任务固定一个 `{taskN}-{pN}-{module}-test-report.md` |
+| 计划先审后跑 | 计划必须先过独立审查（需求覆盖 + 顺序 + 依赖 + 粒度）；审查者 ≠ 计划作者，且必须看真实代码现状，不能只读表格 |
+| 审查用尽需授权 | 计划审查最多 2 轮；第 2 轮仍 FAIL 时只能由用户决定放行或停止，主智能体不得自行 `waived` |
 | 五轮上限 | 同一任务最多执行 5 次 tester 测试，第 5 轮仍 FAIL 标记 ⚠️ 未通过（已放行）并照常提交，然后进入下一个任务 |
 | 依赖风险不中断 | 依赖用于排序和风险提示；上游未通过时下游仍继续，以确保批次可以跑完，但必须记录风险并加强集成验证 |
 | 提交即存档 | 每个任务的提交是"已验证状态"的存档点；三态都要提交，但 ⚠️ / ❌ 必须在提交消息里带标记，不得伪装成通过 |
@@ -85,7 +93,7 @@ super-agent 用三角色 + 修正循环解这三个问题：
 
 ## 工作流概览
 
-主智能体分 4 个工作阶段（A→B→C→D），C 阶段对每个任务循环一次：
+主智能体分 4 个工作阶段（A→B→C→D）。B 阶段内含 B2 计划独立审查与 B3 推送策略确认；C 阶段对每个任务循环一次：
 
 ```
 [阶段 A] 项目初始化（一次性）
@@ -100,10 +108,21 @@ super-agent 用三角色 + 修正循环解这三个问题：
 
    |
    v
-[阶段 B2] 推送策略确认（plan 完成后、循环开始前，只问一次）
-   主智能体 -> 用户：逐任务推送，还是批次末统一推送？
+[阶段 B2] 计划独立审查（新 agent，最多 2 轮）
+   主智能体 -> plan-reviewer（新 ID）：读 dev_doc 全文 + dev-plan + requirements + 扫项目真实代码结构
+             -> 写 {run_root}/plan-reviews/plan-review.md
+   grep ### 判定：
+     PASS -> 进入阶段 B3
+     FAIL -> resume 同一 planner 修计划 -> resume 同一 plan-reviewer 复审
+             第 2 轮仍 FAIL -> 停下问用户（手工调整 / 接受风险 / 停止）
+
+   |
+   v
+[阶段 B3] 推送策略确认（计划审查通过后、循环开始前，只问一次）
+   主智能体 -> 用户：逐任务推送，还是批次末统一推送？（无默认值，必须用户明确选）
    无 git 仓库 / 无远端时不问，直接记"未启用提交"，整套 git 动作跳过（不提交也不推送）
    选择写入 {run_root}/run.json 的 push_policy，并记一行 main-log
+   用户没明确选 -> push_policy 保持 null，重新问；仍不明确则停下等待，不启动 dev
 
    |
    v
@@ -144,11 +163,14 @@ super-agent 用三角色 + 修正循环解这三个问题：
 |---|---|---|
 | 初始化 | PROJECT_ROOT、DEV_DOC 路径 | 主智能体调用 init_workspace.py 创建新批次，取得 RUN_ROOT |
 | planner | DEV_DOC 路径 + PROJECT_ROOT + ERROR_PREFIX | planner 完成 + 产出文件路径列表 |
+| plan-reviewer（首审） | DEV_DOC / DEV_PLAN / REQUIREMENTS / DEV_SPEC / TASK_DECOMPOSITION 路径 + REVIEW_ROUND=1 | PASS/FAIL + 报告绝对路径 + 阻塞问题数 + 建议条数 + 失败摘要（一句话） |
+| planner（修计划） | 审查报告路径 + 阻塞项摘要 | planner 完成 + 修正摘要 + 任务总数 |
+| plan-reviewer（复审） | 同一报告路径 + 上一轮失败摘要 + REVIEW_ROUND=2 | PASS/FAIL + 报告绝对路径 + 阻塞问题数 + 建议条数 + 失败摘要（一句话） |
 | dev（新） | 任务描述 + 必读 3~5 个路径 + 失败摘要（如有） | developer 完成 + 修改文件绝对路径列表 + 1 行变更摘要 |
 | tester（新） | 测试范围 + 待测代码路径列表 + dev-server 地址 | tester PASS/FAIL + 报告绝对路径 |
 | dev（resume） | 同上 + 失败摘要 + 测试报告路径 | developer 完成 + 修改文件绝对路径列表 |
 | tester（resume） | 同一报告路径 + 原失败摘要 | tester PASS/FAIL + 报告绝对路径（追加段） |
-| 推送策略（阶段 B2） | 询问用户：`逐任务推送` / `批次末统一推送` | 写入 `run.json` 的 `push_policy`，记一行 main-log |
+| 推送策略（阶段 B3） | 询问用户：`逐任务推送` / `批次末统一推送` | 写入 `run.json` 的 `push_policy`，记一行 main-log |
 | 提交（每任务） | 任务号 + 标题 + 判定状态 + developer 返回的路径列表 | `commit_task.py` 输出 `OK: {short_hash}` |
 | 推送（逐任务策略） | 上一个任务的 commit hash | `push_task.py --confirm` 输出 `OK:` / `BLOCKED:` / `SKIP:` / `ERROR:` |
 | 推送（批次末策略） | 待推提交清单 + 目标远端与分支 | 用户确认后才执行 `push_task.py --confirm` |
@@ -162,13 +184,19 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | Agent ID 记录 | 主智能体日志每次带 `(ID: {subagent-id})`，用于后续 resume |
 | 必读文件数量 | 最多 5 个（控制子智能体上下文） |
 | 测试轮数上限 | 5（第 5 轮仍 FAIL → 标记 ⚠️ 未通过（已放行）） |
+| 计划审查轮数上限 | 2（首审 + 1 次复审；第 2 轮仍 FAIL → 停下问用户，不自动放行）。用户选择「手工调整后再审」属于授权加审，不计入该上限，但每轮仍须由用户对 FAIL 结果表态 |
+| 审查报告命名 | 一个批次固定 `{run_root}/plan-reviews/plan-review.md`；复审追加 `## 第 N 次审查` 段，不新建文件、不改名 |
+| 审查判定协议 | 与测试报告同协议（`### 判定：PASS/FAIL` 独立标题 + 轮次段），直接复用 `grep_judgement.py --strict` |
+| 审查门槛 | `run.json.plan_review` 必须为 `passed` / `waived` 才允许启动第一个 dev；续跑批次据此跳过或补跑 |
+| 审查阻塞判定 | 阻塞项 ≥ 1 → FAIL；建议项不阻塞（仍可 PASS，只记录）；复查时须逐条核销上一轮阻塞项 |
+| 计划修正边界 | 审查发生在任务循环前，尚未提交任何任务，因此允许重排任务与重编号；一旦改编号，必须同步依赖列与 requirements.md 的承接任务 |
 | 子智能体返回格式 | 极简 5 行内，不含代码（避免主智能体上下文污染） |
 | 文件路径 | 全程绝对路径 |
 | 运行批次 | 提供需求文档时创建新批次；没有需求文档时扫描 `.super-agent/runs/*/run.json` 的 `status`，列出未完成批次并询问继续或新建 |
 | 测试报告命名与追加 | 每个任务固定为 `{taskN}-{pN}-{module}-test-report.md`；重测时追加新轮次段，不覆盖、不改名、不创建 `-2` 轮次文件 |
 | 测试判定协议 | 主智能体只运行 `grep_judgement.py --strict`；严格模式只认最新测试段的最终判定，最新段缺判定时返回 `UNKNOWN` 并触发协议修正，不能沿用旧 PASS |
 | 依赖处理 | `dev-plan.md` 记录依赖；上游非 ✅ 时下游继续，但 tester 必须验证集成假设，main-log 和 final-report 记录依赖风险 |
-| 用户进度格式 | `taskN 开始/PASS/FAIL | 任务标题 | 当前序号/总任务数`；FAIL 时附 `第 N/5 轮`；提交后追加 `已提交 {hash}` |
+| 用户进度格式 | `taskN 开始/PASS/FAIL ｜ 任务标题 ｜ 当前序号/总任务数`；FAIL 时附 `第 N/5 轮`；提交后追加 `已提交 {hash}` |
 | 最终报告 | 全部任务结束后填写 `{run_root}/final-report.md`；聊天给计数汇总、报告路径与推送状态；batch-end 策略下附待推清单并询问是否推送 |
 | 高轮次失败 | 第 3 轮 FAIL 后，resume developer 时必须先查 Context7；不覆盖时用 Firecrawl 查官方资料，禁止猜测 |
 | 错误码断言 | 测试用例必须断言 error_code（不能只验 HTTP 状态码） |
@@ -178,7 +206,7 @@ super-agent 用三角色 + 修正循环解这三个问题：
 | 提交消息 | 只有一行：`taskN: 标题` / `taskN [未通过]: 标题` / `taskN [未能判定]: 标题`，由 `commit_task.py` 统一生成，标题原样取自 dev-plan；**不写 test-rounds / test-report / run 正文** |
 | 提交身份 | 加载时比对「配置身份」与「实际提交身份」（`git var GIT_COMMITTER_IDENT`，受 IDE 注入影响）。不一致就问用户三选一：①用 IDE 默认，本项目不再提示 ②仅本轮用我的 ③本项目以后都用我的。①③记入项目级 `.super-agent/preferences.json`，②只写本批次 `run.json.identity_policy` 且本批提交统一带 `--identity user`；本项目有记录则跳过询问 |
 | ⚠️ 的语义 | ⚠️ = 未通过（已放行）：同一任务用尽 5 轮测试仍未 PASS，按规则放行并提交后进入下一个任务；提交消息里短写为 `[未通过]` |
-| 推送策略 | `per-task`（每任务提交后立即推送）或 `batch-end`（全部提交完统一推送，默认）；不是 git 仓库或没有远端时为 `none`，整套 git 动作跳过；阶段 B2 询问一次，续跑批次读 `run.json` 不再重复问 |
+| 推送策略 | `per-task`（每任务提交后立即推送）或 `batch-end`（全部提交完统一推送）；**无默认值，必须由用户明确选择**；不是 git 仓库或没有远端时为 `none`，整套 git 动作跳过；阶段 B3 询问一次，续跑批次读 `run.json` 沿用已选值；为 `null` 时必须重新问 |
 | 推送命令 | 固定 `git push -u origin {branch}`（`-u` 负责首次绑定 upstream）；用 `push_task.py` 而不是手写，避免推到错的分支 |
 | 推送被拒 | `BLOCKED:` 表示远端领先本地（non-fast-forward）。停手向用户报告，不 force、不自动 rebase/merge |
 | 推送门槛 | 批次末策略：全部任务结束、final-report 写完后列出待推清单询问用户；用户确认前不得 push |
@@ -193,6 +221,7 @@ super-agent/
 ├── agents/                          角色剧本
 │   ├── orchestrator.md              主智能体（编排者）
 │   ├── planner.md                   计划智能体（项目骨架）
+│   ├── plan-reviewer.md             计划审查智能体（独立审查需求覆盖与任务顺序）
 │   ├── developer.md                 开发智能体（执行者）
 │   ├── tester.md                    测试智能体（只读审查）
 │   └── grader.md                    评估智能体（可选回归评估，输出 benchmark.json）
@@ -229,7 +258,8 @@ super-agent/
 | 角色 | 文件 | 职责 |
 |---|---|---|
 | 主智能体 | `agents/orchestrator.md` | 拆任务、调度子智能体、写日志、判 PASS/FAIL |
-| 计划智能体 | `agents/planner.md` | 生成项目骨架、dev-plan、dev-spec |
+| 计划智能体 | `agents/planner.md` | 生成项目骨架、dev-plan、dev-spec；审查 FAIL 时被 resume 修计划 |
+| 计划审查智能体 | `agents/plan-reviewer.md` | 开工前独立审查计划：读需求文档全文 + 扫真实代码结构，核需求覆盖 / 顺序 / 依赖 / 粒度；只写 `plan-reviews/` |
 | 开发智能体 | `agents/developer.md` | 按任务写代码、记录变更、修正 bug |
 | 测试智能体 | `agents/tester.md` | 只读审查、写测试报告到当前批次的 `test-reports/` |
 | 评估智能体 | `agents/grader.md` | 可选回归评估，输出 benchmark.json；不写业务代码或 lessons-learned.md |
@@ -247,6 +277,21 @@ super-agent/
 | 第 5 轮仍 FAIL | 标记 ⚠️ 未通过（已放行）（提交消息带 `[未通过]`），进入下一个任务，不阻塞后续 |
 | 报告文件 | 一个任务固定一个 `{taskN}-{pN}-{module}-test-report.md`；每轮重测追加新段，不覆盖、不改名 |
 
+### 计划审查规则表
+
+| 行为 | 规则 |
+|---|---|
+| 触发条件 | planner 返回文件列表，dev-plan 已落盘 |
+| 审查 Agent | **必须新启动** plan-reviewer（新 ID）；禁止 resume planner 会话自审 |
+| 审查输入 | DEV_DOC 全文 + DEV_PLAN + REQUIREMENTS + DEV_SPEC + 项目真实目录/依赖清单/入口文件 |
+| 审查维度 | 需求覆盖、顺序与依赖、代码现状契合、粒度与可验证性、编号与阶段、风险与外部依赖、测试可行性 |
+| 判定门槛 | 阻塞项 ≥ 1 → FAIL；只有建议项 → PASS（建议写入报告，不阻塞执行） |
+| FAIL 后修计划 | **必须 resume 同一个 planner**（不新启动计划作者） |
+| FAIL 后复审 | **必须 resume 同一个 plan-reviewer**（新启动会丢掉上一轮核销上下文） |
+| 审查轮数上限 | 2 轮（首审 + 1 次复审） |
+| 第 2 轮仍 FAIL | 停下问用户：A 手工调整后跑第 3 轮 / B 接受风险开工 / C 停止批次；主智能体不得自行放行 |
+| 审查通过后 | 重新数任务总数，向用户播报，然后才进推送策略询问 |
+
 
 ## 错误码规范（默认约定，可改）
 
@@ -260,12 +305,17 @@ super-agent/
 - 2026-09-08 15.30 项目启动，当前阶段 = 阶段 A
 - 2026-09-08 15.32 启动 planner (ID: pn-planner-2026-09-08-15.32)
 - 2026-09-08 15.40 planner 完成：dev-plan / dev-spec / 骨架已生成
-- 2026-09-08 15.42 启动 developer task1 (ID: pn-dev-2026-09-08-15.42)
-- 2026-09-08 16.00 developer 完成 task1：history.py / migrations (ID: pn-dev-2026-09-08-15.42)
-- 2026-09-08 16.02 启动 tester task1 (ID: pn-tester-2026-09-08-16.02)
-- 2026-09-08 16.30 tester PASS (ID: pn-tester-2026-09-08-16.02)
-- 2026-09-08 16.31 ── task1 完成 ──
-- 2026-09-08 16.31 提交 task1（PASS）：a1b2c3d
+- 2026-09-08 15.41 启动 plan-reviewer 第 1 轮 (ID: pn-plan-reviewer-2026-09-08-15.41)
+- 2026-09-08 15.50 plan-reviewer FAIL 第 1 轮：task3 依赖倒置 + §4.3 无任务承接 (ID: pn-plan-reviewer-2026-09-08-15.41)
+- 2026-09-08 15.56 resume planner 修正计划：task3 依赖改为 task2，新增 task9 (ID: pn-planner-2026-09-08-15.32)
+- 2026-09-08 16.02 plan-reviewer PASS 第 2 轮（25 个任务，2 条建议）(ID: pn-plan-reviewer-2026-09-08-15.41)
+- 2026-09-08 16.03 推送策略 = batch-end（用户选择）
+- 2026-09-08 16.04 启动 developer task1 (ID: pn-dev-2026-09-08-16.04)
+- 2026-09-08 16.30 developer 完成 task1：history.py / migrations (ID: pn-dev-2026-09-08-16.04)
+- 2026-09-08 16.32 启动 tester task1 (ID: pn-tester-2026-09-08-16.32)
+- 2026-09-08 17.00 tester PASS (ID: pn-tester-2026-09-08-16.32)
+- 2026-09-08 17.01 ── task1 完成 ──
+- 2026-09-08 17.01 提交 task1（PASS）：a1b2c3d
 ```
 
 完整规范（含子智能体日志格式）见 `references/logging-format.md`。
@@ -347,6 +397,9 @@ python {skill_root}/scripts/estimate_context.py
 5. 错误报告是否带 error_code / stage / request_id
 6. 每个任务判定后是否提交，提交范围是否只用 developer 返回的路径
 7. 批次结束后是否先询问用户、未经确认不得推送，以及无 git 仓库时是否整套跳过
-8. 计划完成后、循环开始前是否询问推送策略，逐任务策略下是否每任务提交后立即推送
+8. 计划审查通过后、循环开始前是否询问推送策略（**无默认值**），逐任务策略下是否每任务提交后立即推送
 9. 环境里被注入 `GIT_COMMITTER_NAME=trae-solo-agent` 时，加载阶段是否询问了三选一、是否按用户选择记录并在下批次跳过询问
 10. planner 生成的计划是否把 P0 前置工作编为 `task0`、开发任务从 `task1` 起编号，且 `task0` 不进 dev/test 循环、不提交
+11. planner 完成后是否启动了**全新**的 plan-reviewer 审查计划（而不是自己看一遍），审查是否读了需求文档全文与真实代码结构，FAIL 时是否 resume 同一 planner 修计划 + resume 同一 plan-reviewer 复审，且 planner 会话没有被复用为审查者
+12. 计划审查 2 轮仍 FAIL 时，主智能体是否停下来问用户，而不是自行放行开工
+13. 用户对推送策略回答"看着办 / 随便"时，是否保持 `push_policy = null` 并重新询问，而不是自行填 `batch-end`
