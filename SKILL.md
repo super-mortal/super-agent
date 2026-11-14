@@ -5,7 +5,7 @@ license: MIT
 metadata:
   display_name: "多智能体协同开发"
   display_name_en: "Super Agent"
-  version: "0.0.8"
+  version: "0.0.9"
   category: "development"
   platforms: ["Windows", "macOS", "Linux"]
   author: "super-mortal"
@@ -233,7 +233,7 @@ super-agent/
 │   ├── error-codes.md               错误码命名规范模板
 │   └── directory-structure.md       项目内 .super-agent/ 目录约定
 ├── scripts/                         工具脚本（Python）
-│   ├── init_workspace.py            创建新的 .super-agent/runs/<项目名-日期--批次号>/ 批次目录
+│   ├── init_workspace.py            创建新的 .super-agent/runs/<项目名-日期--批次号>/ 批次目录（同一天编号跨前缀连续递增）
 │   ├── now.py                       输出统一北京时间（日志 / run.json）
 │   ├── grep_judgement.py            从测试报告 grep 提取 PASS/FAIL
 │   ├── register_error_code.py       分配并登记新的项目错误码
@@ -336,7 +336,7 @@ super-agent/
 ## 工具脚本
 
 ```bash
-# 创建新批次；同一天已有批次时自动递增批次号
+# 创建新批次；同一天已有批次时自动递增批次号（编号只按日期计数，跨前缀连续）
 python {skill_root}/scripts/init_workspace.py {project_root} \
   --project-name {project_name} \
   --error-prefix {error_prefix}

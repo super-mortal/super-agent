@@ -139,7 +139,8 @@ python {skill_root}/scripts/now.py --iso
 1. 判断用户是否提供了需求/方案文档路径
    - 提供了：运行 init_workspace.py 创建新批次
      目录格式固定为 .super-agent/runs/{项目名}-{YYYY-MM-DD}--{NN}
-     同一天已有批次时，NN 从 01 自动递增
+     同一天内 NN 按日期连续递增（不按项目名前缀分别计数）：
+     前缀可以不同，同一天第二个批次（即使换了前缀）拿 02，以此类推
    - 未提供：扫描 {runs_dir}/*/run.json
      找出 status != "completed" 的批次；对每个未完成批次读取 plan/requirements.md、
      plan/dev-plan.md 和 logs/main-log.md，恢复需求文档路径、当前阶段和当前任务

@@ -64,18 +64,25 @@ def pascal_prefix(value: str, default: str = "Project") -> str:
 
 
 def next_run_id(agent_dir: Path, project_name: str) -> str:
-    """按当天已有批次计算下一个批次号，例如 pocketnote-2026-09-10--01。"""
+    """按当天已有批次计算下一个批次号，例如 pocketnote-2026-09-10--01。
+
+    编号只按「日期」计数，不区分项目名/子任务前缀：同一天内
+    pocketnote-...--01 之后，另一个前缀的批次接着拿 --02、--03，
+    不会各自从 --01 重新开始。
+    """
     date = now_beijing().strftime("%Y-%m-%d")
     prefix = f"{slugify(project_name)}-{date}--"
     runs_dir = agent_dir / "runs"
     highest = 0
     if runs_dir.is_dir():
+        # 匹配任意前缀，只要日期相同：<任意前缀>-YYYY-MM-DD--<NN>
+        pattern = re.compile(rf".*-{re.escape(date)}--(\d+)$")
         for candidate in runs_dir.iterdir():
-            if not candidate.is_dir() or not candidate.name.startswith(prefix):
+            if not candidate.is_dir():
                 continue
-            suffix = candidate.name[len(prefix):]
-            if suffix.isdigit():
-                highest = max(highest, int(suffix))
+            match = pattern.fullmatch(candidate.name)
+            if match:
+                highest = max(highest, int(match.group(1)))
     return f"{prefix}{highest + 1:02d}"
 
 

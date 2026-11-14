@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
-  <img src="https://img.shields.io/badge/version-0.0.8-blue" alt="version 0.0.8">
+  <img src="https://img.shields.io/badge/version-0.0.9-blue" alt="version 0.0.9">
   <img src="https://img.shields.io/badge/python-%3E%3D3.10-blue" alt="需要 Python 3.10 或更高版本">
 </p>
 
@@ -281,7 +281,7 @@ super-agent/
 ### 工具脚本
 
 ```bash
-# 创建新批次（同一天已有批次时自动递增批次号）
+# 创建新批次（同一天已有批次时自动递增批次号；编号只按日期计数，跨前缀连续）
 python {skill_root}/scripts/init_workspace.py {project_root} \
   --project-name {project_name} --error-prefix {error_prefix}
 
